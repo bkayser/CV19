@@ -1,0 +1,106 @@
+---
+title: "Cleaning Data"
+output: html_notebook
+---
+```{r}
+library(tidyr)
+library(dplyr)
+library(stringi)
+library(ggplot2)
+library(lubridate)
+library(scales)
+```
+
+Let's update the data.
+
+```{r}
+system('git submodule update --remote COVID-19')
+```
+
+Load the timeseries data.
+
+```{r}
+read_and_clean <- function(infile) {
+  # Read the data
+  US.wide <- read.csv(infile)
+  
+  # Identify the date columns so we can gather them
+  datecols <- grep('^X', names(US.wide))
+  
+  # Gather the date columns into a single pair of columns, "date" and "count"
+  # This converts the data from a wide format to a narrow format more amenable to
+  # graphing and reshaping
+  confirmed <- gather(US.wide, key='date', value='count', datecols) %>%
+    select(State=Province_State, County=Admin2, Country=Country_Region, Lat, Long=Long_, Key=Combined_Key, Date=date, Count=count) %>%
+    mutate(Date=mdy(stri_sub(Date, 2)))
+}
+```
+
+Confirmed Cases:
+```{r}
+confirmed <- read_and_clean('COVID-19/csse_covid_19_data/csse_covid_19_time_series/time_series_covid19_confirmed_US.csv')
+saveRDS(confirmed, "data/confirmed_cases.RDS")
+```
+
+Deaths:
+```{r}
+deaths <- read_and_clean('COVID-19/csse_covid_19_data/csse_covid_19_time_series/time_series_covid19_deaths_US.csv')
+saveRDS(deaths, "data/deaths.RDS")
+```
+  
+Confirmed cases, grouped by State.
+
+```{r}
+confirmed %>%
+  filter((State %in% c('New York', 'Oregon', 'Indiana', 'California'))) %>%
+  mutate(State=factor(as.character(State))) %>%
+  group_by(State, Date) %>%
+  summarize(Count=sum(Count)) %>%
+  arrange(State, Date) %>%
+  filter(Count > 0) %>%
+  ggplot() +
+  geom_line() + 
+  scale_y_log10(labels=comma) +
+  ggtitle('COVID-19 Confirmed Cases by States') +
+  aes(Date, Count, color=State)
+
+
+```
+
+Deaths, grouped by State.
+
+```{r}
+data <- deaths %>%
+  filter((State %in% c('New York', 'Oregon', 'Indiana', 'California'))) %>%
+  mutate(State=factor(as.character(State))) %>%
+  group_by(State, Date) %>%
+  summarize(Count=sum(Count)) %>%
+  arrange(State, Date) %>%
+  filter(Count > 0)
+
+g <- ggplot(data) +
+  geom_line() + 
+  ggtitle('COVID-19 Deaths by States') +
+  aes(Date, Count, color=State)
+g + scale_y_log10(labels=comma)
+g + scale_y_continuous(labels=comma)
+
+```
+
+
+Now let's create a derivative of the data.
+
+```{r}
+
+add_first_derivative <- function(data) {
+  data <- confirmed
+  # sort by locale the date
+  data <- arrange(Key, Date)
+  
+  X0 <- c(data$Count)
+  X1 <- c(0, data$Count)
+  
+  
+  
+  
+}
