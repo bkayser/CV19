@@ -13,6 +13,7 @@ library(tidyverse)
 library(lubridate)
 library(scales)
 library(wpp2019)
+library(knitr)
 # library(tidycensus)
 ```
 # Load Datasets
@@ -77,26 +78,29 @@ countries.deaths <- read_and_clean('COVID-19/csse_covid_19_data/csse_covid_19_ti
 ### Load Census Data
 
 This is how you could get data directly using the US Census bureau APIs but the data appears to be too fine grained.  We can use this later if we need more detailed census information.
+
 ```r
 get_estimates(product="population", key=Sys.getenv('CENSUS_KEY'))
 ```
 This is just the static datafile of summary census statistics.  Good enough for now.
 
 ```{r}
-counties <- read.csv('https://www2.census.gov/programs-surveys/popest/datasets/2010-2019/counties/totals/co-est2019-alldata.csv') %>%
+census_data <- read.csv('https://www2.census.gov/programs-surveys/popest/datasets/2010-2019/counties/totals/co-est2019-alldata.csv') %>%
   select(Region=REGION, 
+         Division=DIVISION,
+         CountyCode=COUNTY,
          State=STNAME,
          County=CTYNAME,
          Population=POPESTIMATE2019,
          Annual.Deaths=DEATHS2019) %>%
-  mutate(County=str_match(County, "^(.*) County")[,2],
-         State=as.character(State)) %>%
-  filter(!is.na(County))
+  mutate(State=as.character(State))
+
+counties <- filter(census_data, CountyCode > 0)
+states <- filter(census_data, CountyCode == 0) %>% select(-County, -CountyCode)
 ```
 
 
 # Prepare Data
-
 
 ### Join Tables
 
@@ -121,8 +125,8 @@ Join the confirmed and deaths for country data into a single table, `cvdata.i18n
 
 ```{r}
 cvdata.i18n <- left_join(countries.confirmed, 
-                       select(countries.deaths, Key, Date, Deaths=Count),
-                       by=c('Key', 'Date')) %>%
+                         select(countries.deaths, Key, Date, Deaths=Count),
+                         by=c('Key', 'Date')) %>%
   rename(Confirmed=Count)
 ```
 
@@ -150,8 +154,8 @@ diff <- X1 - X0
 diff[boundaries + 1] <- 0
 
 cvdata.us$Deaths.Diff <- diff
-
 ```
+
 ### Derive Additional Tables
 
 Group data by state and save into table `cvdata.us.by_state`.
@@ -162,11 +166,9 @@ cvdata.us.by_state <- cvdata.us %>%
   summarize(Confirmed = sum(Confirmed),
             Confirmed.Diff = sum(Confirmed.Diff),
             Deaths = sum(Deaths),
-            Deaths.Diff = sum(Deaths.Diff),
-            Region = first(Region),
-            Population = sum(Population),
-            Annual.Deaths = sum(Annual.Deaths)) %>%
-  ungroup(State, Date)
+            Deaths.Diff = sum(Deaths.Diff)) %>%
+  ungroup(State, Date) %>%
+  left_join(states, by=c('State'))
 ```
 
 Create a single timeseries table just for Italy called `italy`.
@@ -181,6 +183,37 @@ italy <- cvdata.i18n %>%
 
 For the US Data I'm just showing a few states so the plots are more readable.  This is just preliminary exploration as I get to know the data and clean it for other purposes.
 
+Let's first set up some parameters for the graph's X axis.
+
+```{r}
+
+start_date <- mdy('02/26/2020')
+end_date <- max(cvdata.us$Date)
+breaks <- seq(end_date,
+              start_date,
+              by="-1 week") %>% rev()
+if (breaks[1] != start_date) {
+  breaks <- c(breaks[1]-days(7), breaks)
+  start_date <- breaks[1]
+}
+```
+
+
+### Top Countries infected
+
+```{r}
+max_date <- max(cvdata.i18n$Date)
+countries <- filter(cvdata.i18n, Date == max_date) %>%
+  arrange(desc(Confirmed)) %>% 
+  top_n(10)
+
+ggplot(countries) +
+  aes(fill=Country,
+      x=Country,
+      y=Confirmed) +
+  geom_col() +
+  xlab(NULL)
+```
 ### Confirmed Cases Grouped by State
 
 ```{r echo=F}
@@ -193,7 +226,9 @@ g <- cvdata.us.by_state %>%
   aes(Date, Confirmed, color=State) +
   ggtitle('COVID-19 Confirmed Cases by States') +
   geom_line() + 
-  xlab(NULL)
+  xlab(NULL) +
+  coord_cartesian(xlim=c(start_date, end_date)) +
+  scale_x_date(breaks=breaks, date_labels = '%m/%d', date_minor_breaks='1 day')
 
 g + scale_y_continuous(labels=comma) 
 g + scale_y_log10(labels=comma) + labs(subtitle="Log Scale")
@@ -211,7 +246,9 @@ g <- cvdata.us.by_state %>%
   aes(Date, Deaths, color=State) + 
   geom_line() + 
   ggtitle('COVID-19 Deaths by State') +
-  xlab(NULL)
+  xlab(NULL) +
+  coord_cartesian(xlim=c(start_date, end_date)) +
+  scale_x_date(breaks=breaks, date_labels = '%m/%d', date_minor_breaks='1 day')
 
 g + scale_y_continuous(labels=comma) 
 g + scale_y_log10(labels=comma) + labs(subtitle = 'Log Scale') 
@@ -226,7 +263,7 @@ Right now you can see New York is a long way from that but the LOESS trend line 
 
 
 ```{r echo=F}
-cvdata.us %>%
+g <- cvdata.us %>%
   filter(State %in% c('New York', 'Oregon', 'Indiana', 'California')) %>%
   mutate(State = fct_drop(State)) %>%
   group_by(State, Date) %>%
@@ -238,13 +275,32 @@ cvdata.us %>%
   ggtitle('COVID-19 Confirmed Cases Day to Day Change, by States',
           subtitle = str_c("Reported data through ", format(max(cvdata.us$Date), "%B %d, %Y"))) +
   aes(Date, Confirmed.Diff, color=State) +
-  coord_cartesian(xlim=c(mdy('03/04/2020'), max(cvdata.us$Date))) +
   scale_x_date() +
   ylab("Daily Increase") +
-  xlab(NULL) 
+  xlab(NULL)  +
+  coord_cartesian(xlim=c(start_date, end_date)) +
+  scale_x_date(breaks=breaks, date_labels = '%m/%d', date_minor_breaks='1 day')
+
+g
 
 ```
 
+
+### Infections Per Capita
+
+Let's chart the current confirmed cases and deaths as a percentage of population.
+
+```{r}
+last_date <- max(cvdata.us.by_state$Date)
+
+cvdata.us.by_state %>%
+  filter(Date == last_date) %>%
+  mutate(Infections.Per.1000 = 1000 * Confirmed / Population,
+         Deaths.Per.1000 = 1000 * Deaths / Population) %>%
+  select(State, Infections.Per.1000, Deaths.Per.1000) %>%
+  arrange(desc(Infections.Per.1000)) 
+
+```
 ## Save the Data
 
 ```{r}
