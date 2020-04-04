@@ -305,5 +305,6 @@ cvdata.us.by_state %>%
 
 ```{r}
 saveRDS(cvdata.us, 'data/cvdata.us.RDS')
+saveRDS(cvdata.us.by_state, 'data/cvdata.us.by_state.RDS')
 saveRDS(cvdata.i18n, 'data/cvdata.i18n.RDS')
 ```
