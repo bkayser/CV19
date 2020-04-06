@@ -17,7 +17,8 @@ shinyUI(fluidPage(
     sidebarLayout(
         sidebarPanel(
           helpText("Select the content to display, either Confirmed Cases, or Deaths."),
-          radioButtons('content', NULL, c('Confirmed', 'Deaths'), 'Confirmed', inline=T),
+          radioButtons('content', NULL, c('Cases', 'Deaths'), 'Cases', inline=T),
+          helpText("To change the selected states, edit the field and delete states, or add new ones from the drop down list."),
           selectInput('states', 'States', states, 
                       selected = c('New York', 'Oregon', 'Indiana', 'California', 'Washington', 'Arizona'),
                       multiple = TRUE,
@@ -36,7 +37,6 @@ shinyUI(fluidPage(
             #             value = 0.5),
 
             #h2('Instructions'),
-            #p("Select the content to display, either Confirmed Cases, or Deaths."),
           
           
           ),

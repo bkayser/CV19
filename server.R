@@ -15,7 +15,7 @@ shinyServer(function(input, output) {
         filter(State %in% input$states) %>%
         mutate(State=fct_drop(State)) %>%
         arrange(State, Date) %>%
-        filter( Confirmed > 0)
+        filter( Cases > 0)
       
       data[, 'value'] <- data[,input$content]
         
