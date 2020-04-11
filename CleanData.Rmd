@@ -2,14 +2,17 @@
 title: "Cleaning COVID-19 Data from Johns Hopkins"
 author: "Bill Kayser"
 output:
+  html_notebook: 
+    fig_height: 6
+    fig_width: 12
+    toc: yes
+  html_document: default
   pdf_document: 
     fig_height: 4
     fig_width: 7
     toc: yes
-  html_document: default
-  html_notebook: 
-    fig_height: 6
-    fig_width: 12
+echo: TRUE
+
 ---
 
 Initialize the Notebook loading the following required libraries. 
@@ -20,6 +23,7 @@ library(lubridate)
 library(scales)
 library(wpp2019)
 theme_set(theme_light())
+source('utils.R')
 ```
 
 
@@ -48,49 +52,11 @@ system('git submodule update --remote COVID-19')
 
 Load the timeseries data.  We'll need to convert the table from a wide format where the time series is in columns to a narrow format where each observation is a single datapoint for a day.
 
-This function will process the different timeseries files uniformly.
+### Load Timeseries Data
 
-```{r}
-read_and_clean <- function(infile) {
-  # Read the data
-  cv.wide <- read.csv(infile)
-  if ('Country.Region' %in% names(cv.wide)) {
-    # This is the countries data so column names need to be adjusted
-    cv.wide <- rename(cv.wide,
-                      Province_State=Province.State,
-                      Country_Region=Country.Region,
-                      Long_=Long) %>%
-      mutate(Admin2=NA,
-             Combined_Key=str_c(Country_Region, ", ", Province_State))
-  } else {
-    # There are two counties without FIPS codes for Kansas City, and "Dukes and Nantucket".  I think these double-count so I'm removing them.
-    cv.wide <- filter(cv.wide,
-                      !is.na(FIPS))
-    
-  }
-  # Identify the date columns so we can gather them
-  datecols <- grep('^X', names(cv.wide))
-  
-  # Gather the date columns into a single pair of columns, "date" and "count"
-  # This converts the data from a wide format to a narrow format more amenable to
-  # graphing and reshaping
-  gather(cv.wide, key='date', value='count', datecols) %>%
-    select(State=Province_State, starts_with('FIPS'), County=Admin2, Country=Country_Region, Lat, Long=Long_, Key=Combined_Key, Date=date, Count=count) %>%
-    mutate(Date=mdy(str_sub(Date, 2))) %>%
-    as_tibble()
-}
-```
-
-### Load US Timeseries Data
-
-```{r}
+```{r, echo=T}
 cases <- read_and_clean('COVID-19/csse_covid_19_data/csse_covid_19_time_series/time_series_covid19_confirmed_US.csv')
 deaths <- read_and_clean('COVID-19/csse_covid_19_data/csse_covid_19_time_series/time_series_covid19_deaths_US.csv')
-```
-
-### Load International Timeseries Data
-
-```{r}
 countries.cases <- read_and_clean('COVID-19/csse_covid_19_data/csse_covid_19_time_series/time_series_covid19_confirmed_global.csv')
 countries.deaths <- read_and_clean('COVID-19/csse_covid_19_data/csse_covid_19_time_series/time_series_covid19_deaths_global.csv')
 ```
@@ -102,16 +68,20 @@ This is how you could get data directly using the US Census bureau APIs but the 
 ```r
 get_estimates(product="population", key=Sys.getenv('CENSUS_KEY'))
 ```
-This is just the static datafile of summary census statistics.  Good enough for now.
+
+For now I'm just going to use some data I picked up off the census web site in the form of 2019 population estimates by county, and a very old file with square miles for all but about 25 counties.
 
 ```{r}
 regions <- c('Northeast', 'Midwest', 'South', 'West')
 divisions <- c('N Atlantic', 'Mid Atlantic', 'E North Ctrl', 'W North Ctrl', 'S Atlantic', 'E South Ctrl', 'W South Dtrl', 'Mountain', 'Pacific')
 
-census_data <- read.csv('https://www2.census.gov/programs-surveys/popest/datasets/2010-2019/counties/totals/co-est2019-alldata.csv') %>% 
+geographic_data <- prep_geographic_data(read.csv('data/county_area.csv', skip=7)) 
+
+population_data <- read.csv('https://www2.census.gov/programs-surveys/popest/datasets/2010-2019/counties/totals/co-est2019-alldata.csv') %>% 
   mutate(Region = as.factor(regions[REGION]),
          Division = as.factor(divisions[DIVISION]),
          FIPS=as.integer(str_c(STATE,sprintf('%0.3i', COUNTY)))) %>%
+  left_join(geographic_data, by=c(STNAME='State', CTYNAME='County')) %>%
   select(Region,
          State=STNAME,
          Division,
@@ -119,11 +89,13 @@ census_data <- read.csv('https://www2.census.gov/programs-surveys/popest/dataset
          CountyCode=COUNTY,
          CTYNAME,
          Population=POPESTIMATE2019,
-         Annual.Deaths=DEATHS2019) %>%
+         Annual.Deaths=DEATHS2019, 
+         Area) %>%
+  mutate(Population.Density = round(Population / Area, 3)) %>%
    as_tibble()
 
-counties <- filter(census_data, CountyCode > 0) %>% select(-State, -CTYNAME)
-states <- filter(census_data, CountyCode == 0) %>% select(-CountyCode)
+counties <- filter(population_data, CountyCode > 0) %>% select(-State, -CTYNAME)
+states <- filter(population_data, CountyCode == 0) %>% select(-CountyCode)
 ```
 
 ### Load CovidTracking data
@@ -137,12 +109,13 @@ covid.testing <- read.csv('https://covidtracking.com/api/v1/states/daily.csv') %
   left_join(state_abbreviations, by=c(state='State.Code')) %>%
   rename(State.Code=state, Date=date) %>%
   mutate(Date = as.Date(as.POSIXct(strptime(as.character(Date), format='%Y%m%d'))))
-
 ```
 
 # Prepare Data
 
 ### Join Tables
+
+Start combining tables with external data.  Also invokes `calculate_differentials()` which adds new variables which are the single day and 3 day changes to Cases and Deaths, in addition to a Growth3 variable which is the average daily growth rate of Cases and Deaths over a three day period.
 
 Join the US confirmed cases to deaths and census population data.  Create a single table, `cvdata.us`.
 
@@ -154,52 +127,31 @@ cvdata.us <- left_join(cases,
          Deaths = Count.y) %>%
   left_join(counties, by='FIPS') %>% 
   left_join(state_abbreviations, by='State') %>% 
-  filter(!is.na(Region))
+  filter(!is.na(Region)) %>%
+  mutate(State = as.factor(State), 
+         County = as.factor(County)) %>%
+  calculate_differentials(c('Cases', 'Deaths'))
 ```
 
 Join the cases and deaths for country data into a single table, `cvdata.i18n`.
 
 ```{r}
-cvdata.i18n <- left_join(countries.cases, 
-                         select(countries.deaths, Key, Date, Deaths=Count),
-                         by=c('Key', 'Date')) %>%
-  rename(Cases=Count)
-```
+populations <- read.csv('data/population.csv', skip = 3, stringsAsFactors = F) %>% select(Country = Country.Name, Population = X2018)
+populations[populations$Country == 'Korea, Rep.', 'Country'] = 'Korea, South'
+populations[populations$Country == 'United States', 'Country'] = 'US'
+populations[populations$Country == 'Russian Federation', 'Country'] = 'Russia'
+populations[populations$Country == 'Iran, Islamic Rep.', 'Country'] = 'Iran'
+populations[populations$Country == 'Taiwan*', 'Country'] = 'Taiwan'
+populations[nrow(populations)+1, ] <- list('China, Hubei', 58.5e6) # 2015 National bureau of stats, China
 
-### Add in First Derivative
-
-A lot of sources present "New Cases" but I don't have that data yet so I can calculate the day to day change.  I don't think this is the same as new cases because the day to day change presumably factors in deaths and recoveries.
-
-It will be interesting to study not just the day to day numbers, but the change in the numbers from day to day.  I will manually calculate this first derivative and store the values in colums appended with `.Diff`.
-
-I will also create a smoothed derivative called `.Diff3` which is the average increase over the last three days.
-
-I can accurately calculate "New Deaths".
-
-```{r}
-# sort by locale the date
-cvdata.us <- arrange(cvdata.us, Key, Date)
-# Caclulate the boundaries
-boundaries <- which(cvdata.us$Key[2:nrow(cvdata.us)] != cvdata.us$Key[1:nrow(cvdata.us)-1])
-
-# Calculate differential  
-X1 <- cvdata.us[,c('Cases', 'Deaths')]
-X0 <- cvdata.us[c(1, (1:nrow(X1)-1)), c('Cases', 'Deaths')]
-cvdata.us[, c('Cases.Diff', 'Deaths.Diff')] <- X1 - X0
-
-# Calculate the 3 day differential
-X1 <- cvdata.us[,c('Cases', 'Deaths')]
-X0 <- cvdata.us[c(1, 1, 1, 1:(nrow(X1)-3)), c('Cases', 'Deaths')]
-cvdata.us[, c('Cases.Diff3', 'Deaths.Diff3')] <- round((X1 - X0) / 3.0)
-
-
-
-cvdata.us[boundaries + 1, c('Cases.Diff', 'Deaths.Diff')] <- 0
-cvdata.us[c(boundaries + 1,
-            boundaries + 2,
-            boundaries + 3), c('Cases.Diff3', 'Deaths.Diff3')] <- 0
-
-
+cvdata.i18n <- 
+  countries.cases %>%
+  left_join(populations, by='Country') %>%
+  left_join(select(countries.deaths, Key, Date, Deaths=Count),
+            by=c('Key', 'Date')) %>%
+  rename(Cases=Count) %>% 
+  calculate_differentials(c('Cases', 'Deaths'))
+  
 ```
 
 ### Derive Additional Tables
@@ -210,15 +162,15 @@ Group data by state and save into table `cvdata.us.by_state`.
 cvdata.us.by_state <- cvdata.us %>%
   group_by(State, Date) %>%
   summarize(Cases = sum(Cases),
-            Cases.Diff = sum(Cases.Diff),
-            Deaths = sum(Deaths),
-            Deaths.Diff = sum(Deaths.Diff))%>%
+            Key = first(State),
+            Deaths = sum(Deaths))%>%
   ungroup(State, Date) %>%
   left_join(states, by=c('State')) %>% mutate(State = as.factor(State)) %>%
   filter(!is.na(Region))  %>%
   # Join with the testing data
   left_join(covid.testing, by=c('State', 'Date')) %>%
   select(-hash, -dateChecked, -fips, -CTYNAME) %>% 
+  calculate_differentials(c('Cases', 'Deaths')) %>%
   mutate(State.Code = fct_inorder(as.factor(State.Code)),
          State = fct_inorder(as.factor(State)),
          Infection.Rate = Cases.Diff * 1000000 / Population,
@@ -230,7 +182,8 @@ Create a single timeseries table just for Italy called `italy`.
 ```{r}
 italy <- cvdata.i18n %>%
   filter(Country == 'Italy') %>%
-  select(-State, -County, -Key, -Lat, -Long, -Country)
+  select(-Key, -Lat, -Long, -Country) 
+
 ```
 
 # Data Exploration
@@ -260,25 +213,54 @@ if (breaks[1] != start_date) {
 ```{r}
 cvdata.us %>%
   filter(!is.na(Division) & Date == end_date) %>%
-  mutate(Cases.Per.100K = round(Cases * 100000 / Population)) %>%
-  arrange(desc(Cases.Per.100K)) %>%
-  select(Key, Cases.Per.100K, Deaths) %>%
-  top_n(50) %>% knitr::kable()
+  arrange(desc(Cases.Per100K)) %>%
+  select(Key, Cases.Per100K, Deaths) %>%
+  top_n(25) %>% knitr::kable()
 ```
+
+### Reporting Anomalies
+
+Consider the growth in deaths and cases, county by county, on each day of the week when there are at least 100 active confirmed cases.
+
+```{r}
+cvdata.daily <- cvdata.us %>%
+  filter(Cases > 100) %>%
+  mutate(day.of.week = factor(strftime(Date, '%A'), levels = c('Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday')),
+         Cases.Growth = Cases.Diff / Cases,
+         Deaths.Growth = ifelse(Deaths == 0, 0, Deaths.Diff / Deaths))
+```
+
+What is the typical change in Confirmed Cases and Deaths on any day of the week?
+
+```{r}
+group_by(cvdata.daily, day.of.week) %>%
+  summarize(Cases.Growth.Mean = percent(mean(Cases.Growth)),
+            Deaths.Growth.Mean = percent(mean(Deaths.Growth, na.rm=T)))
+
+ggplot(cvdata.daily) +
+  aes(x=day.of.week, y = Cases.Growth) +
+  geom_boxplot() +
+  xlab('Day of Week') +
+  ylab('Growth in Cases') +
+  scale_y_continuous(labels=percent)
+```
+
 
 ### Top Countries infected
 
-```{r top_countries}
+```{r top_countries, fig.width=5}
 max_date <- max(cvdata.i18n$Date)
-countries <- filter(cvdata.i18n, Date == max_date) %>%
+countries <- 
+  filter(cvdata.i18n, Date == max_date) %>%
   arrange(desc(Cases)) %>% 
-  top_n(10)
+  head(10)
 
 ggplot(countries) +
   aes(fill=Country,
       x=Country,
       y=Cases) +
-  geom_col() +
+  geom_col(show.legend=F) +
+  scale_y_continuous(labels=comma) +
   xlab(NULL)
 ```
 
@@ -359,33 +341,80 @@ cvdata.us.by_state %>%
   ggplot() +
   geom_line() + 
   #geom_smooth(method='loess', span=0.2, size=0.5, linetype=3) +
-  ggtitle('COVID-19 Rate of Deaths Per Capita, by States',
+  ggtitle('COVID-19 Rate of Deaths Per Million, by States',
           subtitle = str_c("Reported data through ", format(max(cvdata.us$Date), "%B %d, %Y"))) +
   aes(Date, Death.Rate, color=State) +
-  ylab("Daily Increase") +
+  ylab("Daily Increase, per 1M people") +
   xlab(NULL)  +
   coord_cartesian(xlim=c(start_date, end_date)) +
   scale_x_date(breaks=breaks, date_labels = '%m/%d', date_minor_breaks='1 day')
 
 ```
 
-```{r, fig.width=6, fig.height=6}
-today <- filter(cvdata.us) %>%
-  filter(Date == end_date & !is.na(Region) & Population > 500) %>%
-  mutate(Death.Rate = 1000000 * Deaths / Population) 
 
-averages.by_state <- tapply(today$Death.Rate, today$State.Code, mean) %>% sort() %>% rev()
-today <- mutate(today, State.Code = fct_relevel(State.Code, names(averages.by_state)))
+### International Cases
 
-ggplot(today) +
-  aes(x = State.Code, y = Death.Rate, fill = Region) +
-  coord_flip() +
-  scale_y_log10() +
-  geom_boxplot()
+```{r fig.width=6}
+d0 <- filter(cvdata.i18n, Deaths >= 5 & Country %in% c("China, Hubei", "Spain", "France", "Germany","Iran", "Italy", "Korea, South", "United Kingdom", "US")) %>%
+  mutate(Country = as.character(Country)) %>%
+  filter(!is.na(Population))
+
+d1 <- split(d0, d0$Country)
+d2 <- lapply(d1, function(table) {
+  table$Day <- 1:nrow(table)
+  table
+})
+
+labels <- lapply(d2, tail, 1) %>% bind_rows()
+
+country_data <- bind_rows(d2)
+
+g <- ggplot(country_data) +
+  aes(x=Day, color=Country) +
+  geom_line(show.legend = F) +
+  geom_text(data=labels, 
+            mapping=aes(label=Country),
+            show.legend = F,
+            nudge_x = 0.5,
+            check_overlap = F,
+            size=3,
+            hjust = 0) +
+  coord_cartesian(xlim=c(0, max(labels$Day) + 15)) +
+  ggtitle(paste0("National Trends as of ",format(end_date, "%B%e, %Y")), subtitle="Plotted individually from the first day of 5 recorded deaths") +
+  xlab("Days Since First 24 Deaths") +
+  facet_wrap('Country')
+
+g + aes(y=Cases.Growth3) +
+  ylab("Daily Increase in Cases") +
+  scale_y_continuous(labels=percent) 
+
+g + aes(y=Cases) + 
+  ylab("Confirmed Cases")  +
+  scale_y_continuous(labels=comma) 
+
+g + aes(y=Deaths.Per100K) + 
+  ylab("Deaths Per 100K Population") +
+  scale_y_continuous(labels=comma) 
+
 ```
 
 
+### State by State Confirmed Cases
 
+```{r, fig.width=6, fig.height=6}
+today <- filter(cvdata.us) %>%
+  filter(Date == end_date & !is.na(Region) & Population > 500) %>%
+  mutate(Cases.Rate = 1000000 * Cases / Population) 
+
+averages.by_state <- tapply(today$Cases.Rate, today$State.Code, mean) %>% sort() %>% rev()
+today <- mutate(today, State.Code = fct_relevel(State.Code, names(averages.by_state)))
+
+ggplot(today) +
+  aes(x = State.Code, y = Cases.Rate, fill = Region) +
+  coord_flip(ylim=c(0,2000)) +
+  geom_boxplot() +
+ggtitle("")
+```
 
 ### Infections Per Capita
 
@@ -399,19 +428,18 @@ cvdata.us.by_state %>%
   mutate(Infections.Per.100_000 = round(100000 * Cases / Population),
          Deaths.Per.100_000 = round(100000 * Deaths / Population, 1)) %>%
   select(State, Infections.Per.100_000, Deaths.Per.100_000) %>%
-  arrange(desc(Infections.Per.100_000)) 
+  arrange(desc(Infections.Per.100_000)) %>%
+  head(10)
 
 ```
 
 ### Infection Rate by Region
 
-```{r}
-data <- cvdata.us.by_state %>%
-  filter(Date == last_date) %>%
-  mutate(Deaths.Per.100K = 100000 * Deaths / Population)
+```{r fig.width=5}
+data <- cvdata.us.by_state %>% filter(Date == last_date)
 
 ggplot(data) +
-  aes(x=Division, y=Deaths.Per.100K, fill=Division) +
+  aes(x=Division, y=Deaths.Per100K, fill=Division) +
   geom_boxplot() +
 #  scale_y_log10(labels=comma) +
 #  scale_x_discrete(labels=NULL) +
@@ -424,42 +452,215 @@ ggplot(data) +
 
 Essex and Franklin counties seem to be closest.
 
-```{r}
-nycounties <- filter(cvdata.us, State == "New York" & County %in% c('Essex', 'Franklin', 'Clinton'))
-ggplot(nycounties) +
-  aes(x=Date, y=Cases, color=County) +
-  geom_line() + 
-  #geom_smooth(method='loess', span=0.2, size=0.5, linetype=3) +
-  ggtitle('Lake Placid Region',
-          subtitle = str_c("Reported data through ", format(max(cvdata.us$Date), "%B %d, %Y"))) +
-  ylab("Confirmed Cases") +
+```{r, fig.height=5}
+our_counties <- filter(cvdata.us, 
+                     (State == "New York" & County %in% c('Essex', 'Franklin', 'Clinton')) |
+                     (State == "Indiana" & County %in% c('Hamilton')) |                       
+                       (State == "California" & County %in% c('Contra Costa')) |
+                     (State == "Arizona" & County %in% c('Maricopa')) |
+                       (State == "Oregon" & County %in% c('Clackamas', 'Multnomah', 'Washington')))
+labels <- filter(our_counties, Date == last_date)
+
+g <- ggplot(our_counties) +
+  aes(x=Date, y=Cases.Per100K, color=County) +
   xlab(NULL)  +
-  coord_cartesian(xlim=c(start_date, end_date)) +
+  coord_cartesian(xlim=c(mdy('03/15/2020'), end_date)) +
+  ggtitle('Kayser Family Counties',
+          subtitle = str_c("Reported data through ", format(max(cvdata.us$Date), "%B %d, %Y"))) +
+  geom_line(aes(linetype=State)) + 
+  geom_label(data=labels, aes(label=Key), hjust='right', show.legend=F, nudge_x = -1) +
   scale_x_date(breaks=breaks, date_labels = '%m/%d', date_minor_breaks='1 day')
+
+g +
+  aes(y = Cases.Per100K) +
+  ylab("Confirmed Cases per 100K Population")
+
+g +
+  aes(y = Cases) +
+  ylab("Confirmed Cases")
 ```
 
-Total deaths to date in all three counties: `r total_deaths`.
+
 
 
 ```{r}
 all_counties <- cvdata.us %>%
   filter(!is.na(Division) & Date == end_date) %>%
-  mutate(Cases.Per.100K = round(Cases * 100000 / Population)) %>%
-  arrange(desc(Cases.Per.100K)) %>%
-  select(Key, Cases.Per.100K) 
+  arrange(desc(Cases.Per100K)) %>%
+  select(Key, Cases.Per100K) 
 
-LP.Cases.Per.100K <- filter(nycounties, Date == last_date) %>% 
+LP.Cases.Per100K <- filter(our_counties, Date == last_date) %>% 
   group_by(State) %>%
   summarize(Deaths = sum(Deaths),
             Cases = sum(Cases),
             Population = sum(Population)) %>%
   ungroup() %>%
-  mutate(Cases.Per.100K = Cases * 100000 / Population) %>%
-  select('Cases.Per.100K') 
+  mutate(Cases.Per100K = Cases * 100000 / Population)
 
-ranking <- round(sum(all_counties$Cases.Per.100K <= LP.Cases.Per.100K$Cases.Per.100K[1]) / nrow(all_counties) * 100, 1)
-median_rate <- median(all_counties$Cases.Per.100K)
+ranking <- round(sum(all_counties$Cases.Per100K <= LP.Cases.Per100K$Cases.Per100K[1]) / nrow(all_counties) * 100, 1)
+median_rate <- median(all_counties$Cases.Per100K)
 ```
+
+Total deaths to date in all three counties: `r LP.Cases.Per100K$Deaths`.
+
+Total cases per 100K people: `r round(LP.Cases.Per100K$Cases.Per100K, 1)`
+
+# Scatter Plots
+
+Population Density vs. Infection Rate
+```{r}
+current_data <- filter(cvdata.us, Date == last_date & !is.na(Population.Density)) %>%
+  mutate(Deaths.Per100K = Deaths * 100000 / Population)
+ggplot(current_data) +
+  aes(x=Cases.Diff3.Per100K) +
+  geom_histogram(bins=400) +
+  coord_cartesian(xlim=c(-10, 50))
+
+ggplot(filter(current_data, Deaths.Per100K > 0)) +
+  aes(x=Population.Density, y=Deaths.Per100K, show.legend=F) +
+  geom_point(size=0.2) +
+  geom_smooth(method='loess', color='red', size=0.5) +
+  scale_y_log10(labels=comma) + 
+  scale_x_log10() 
+```
+
+# Prediction
+
+
+```{r fig.width=6}
+
+d0 <- filter(cvdata.us.by_state, Cases > 100 & Cases.Growth3 > 0.010 & State %in% c("New York", "Oregon", "California", "New Jersey", "Arizona", "Indiana")) %>%
+  mutate(State = fct_drop(State))
+
+d1 <- group_by(d0, State) %>%
+  summarize(Cases.Growth3 = max(Cases.Growth3))
+
+sd0 <- semi_join(d0, d1, by=c('State', 'Cases.Growth3'))
+
+start_dates <- sd0$Date
+names(start_dates) <- sd0$State
+
+d3 <- split(d0, d0$State)
+
+# Filter the dates of each country to include only dates after the peak growth in cases occur.
+d4 <- lapply(d3, function(table) {
+  state <- table$State[1]
+  t <- filter(table, Date >= start_dates[state])
+  # Index this remaining data by Day, starting with the value Day = 1.
+  t$Day <- 1:nrow(t)
+  t
+})
+
+labels <- lapply(d4, tail, 1) %>% bind_rows()
+
+# Rejoin the data
+state_data <- bind_rows(d4)
+# filter(state_data, Country == 'China, Hubei') %>% view()
+
+g <- ggplot(state_data) +
+  aes(x=Day, color=State) +
+  geom_line(show.legend = F) +
+  geom_text(data=labels, 
+            mapping=aes(label=State),
+            show.legend = F,
+            nudge_x = 0.5,
+            check_overlap = F,
+            size=4,
+            hjust = 0) +
+  coord_cartesian(xlim=c(0, max(labels$Day) + 15)) +
+  ggtitle(paste0("National Trends as of ",format(end_date, "%B%e, %Y")), subtitle="Plotted individually from the first day of 5 recorded deaths") +
+  xlab("Days Since First 24 Deaths") +
+  facet_wrap('State') +
+  theme(strip.text.x = element_text(face='bold', size=12))
+
+g + aes(y=Cases.Growth3) +
+  ylab("Daily Increase in Cases") +
+  geom_smooth(method='glm', size=0.5, color='black', se=F, formula= y ~ x) +
+  scale_y_continuous(labels=percent) 
+# 
+# g + aes(y=Cases) + 
+#   ylab("Confirmed Cases")  +
+#   scale_y_continuous(labels=comma) 
+# 
+# g + aes(y=Deaths.Per100K) + 
+#   ylab("Deaths Per 100K Population") +
+#   scale_y_continuous(labels=comma) 
+
+```
+
+
+
+```{r fig.width=6}
+
+# Step 0: Filter the left and right edge of the timeseries
+d0 <- filter(cvdata.i18n, Cases > 100 & Cases.Growth3 > -0.01 & Country %in% c("China, Hubei", "Spain", "France", "Germany","Iran", "Italy", "Korea, South", "United Kingdom", "US")) %>%
+  mutate(Country = as.character(Country)) %>%
+  filter(!is.na(Population))
+
+d1 <- group_by(d0, Country) %>%
+  summarize(Cases.Growth3 = max(Cases.Growth3))
+
+d2 <- semi_join(d0, d1, by=c('Country', 'Cases.Growth3')) %>%
+  select(Country, Date)
+
+start_dates <- d2$Date
+names(start_dates) <- d2$Country
+
+# Split the table of countries into separate tables per country
+d1 <- split(d0, d0$Country)
+
+# Filter the dates of each country to include only dates after the peak growth in cases occur.
+d2 <- lapply(d1, function(table) {
+  country <- table$Country[1]
+  t <- filter(table, Date >= start_dates[country])
+  # Index this remaining data by Day, starting with the value Day = 1.
+  t$Day <- 1:nrow(t)
+  t
+})
+
+labels <- lapply(d2, tail, 1) %>% 
+  bind_rows() %>%
+  mutate(label = paste0(Country, " - ", format(Date, "%m/%d")))
+
+# Let's predict the peak
+
+extrapolate <- function(df) {
+  c <- coef(lm(df, formula = Cases.Growth3 ~ Day))
+  peak_day <- -c['(Intercept)']/c['Day']
+  t0 <- min(df$Date)
+  peak_date <- t0 + days(ceiling(peak_day))
+}
+
+# Rejoin the data
+country_data <- bind_rows(d2)
+# filter(country_data, Country == 'China, Hubei') %>% view()
+
+
+
+g <- ggplot(country_data) +
+  aes(x=Day, color=Country) +
+  geom_line(show.legend = F) +
+  geom_text(data=labels, 
+            mapping=aes(label=label),
+            show.legend = F,
+            nudge_x = 0.5,
+            check_overlap = F,
+            size=4,
+            hjust = 0) +
+  coord_cartesian(xlim=c(0, max(labels$Day) + 15)) +
+  ggtitle(paste0("National Trends as of ",format(end_date, "%B%e, %Y")), subtitle="Plotted individually from the first day of 5 recorded deaths") +
+  xlab("Days Since First 24 Deaths") +
+  facet_wrap('Country') +
+  theme(strip.text.x = element_text(face='bold', size=12))
+
+g + aes(y=Cases.Growth3) +
+  ylab("Daily Increase in Cases") +
+#  geom_smooth(method='glm', formula= y ~ x, se=F, color='black', size=0.2) +
+  scale_y_continuous(labels=percent) 
+
+```
+
+
 # Save the Data
 
 ```{r echo=T}
