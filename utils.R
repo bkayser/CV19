@@ -1,3 +1,9 @@
+library(tidyverse)
+library(lubridate)
+library(scales)
+library(wpp2019)
+
+
 read_and_clean <- function(infile) {
   # Read the data
   cv.wide <- read.csv(infile, stringsAsFactors = F)
