@@ -1,0 +1,290 @@
+---
+title: "Prediction Using COVID-19 Data from Johns Hopkins"
+author: "Bill Kayser"
+output:
+  pdf_document: 
+    fig_height: 4
+    fig_width: 7
+    toc: yes
+  html_document: default
+  html_notebook: 
+    fig_height: 6
+    fig_width: 12
+    toc: yes
+echo: TRUE
+---
+
+```{r results='hide', message=F, include=F}
+library(tidyverse)
+library(scales)
+library(knitr)
+theme_set(theme_light())
+source('utils.R')
+knitr::opts_chunk$set(echo=F)
+```
+
+
+<style type="text/css">
+.table {
+    width: inherit;
+    max-width: 100%;
+    margin-bottom: 20px;
+}
+.math.display {
+  font-size: 28px;
+}
+</style>
+
+
+```{r echo=T, include=F}
+cvdata.us <- readRDS('data/cvdata.us.RDS')
+cvdata.us.by_state <- readRDS('data/cvdata.us.by_state.RDS')
+cvdata.i18n <- readRDS('data/cvdata.i18n.RDS')
+end_date <- max(cvdata.us$Date)
+```
+
+This is an attempt to predict when recovery from the virus begins in different regions.  I did a lot of exploration to see if there were any 
+variables that I could normalize and model for prediction.  I looked at many charts of Confirmed Cases and Deaths as well as their first and second derivatives.  
+Data about Deaths is sparse, and the data about confirmed cases is unreliable. 
+
+Confirmed Cases is the total number of confirmed cases since the start of the outbreak.  It does not take into account recoveries or deaths, and it never decreases.  The time series chart of Confirmed Cases looks like the following.
+
+```{r}
+cvdata.i18n %>% filter(Country %in% c('Italy', 'China, Hubei', 'Korea, South', 'US', 'Spain')) %>%
+  ggplot() +
+  aes(x=Date, y=Cases, color=Country) +
+  geom_line() +
+  scale_y_continuous(labels=comma) +
+  ggtitle("Confirmed Cases in Key Countries Over Time") +
+  ylab("Confirmed Cases") +
+  xlab(NULL)
+```
+
+You can see this is increasing relentlessly in the US, Spain, and Italy.  In China where Wuhan is and in South Korea the cases have leveld off.  This seemed to beg the question...
+
+**Can we predict when cases will level off in other regions?**
+
+I kept digging through the data until the one thing that stuck out was the rate of growth of new cases.  I derived this parameter from the of total Confirmed Cases shown in the plot above.  I called it "Growth" and calculated it by taking the average number of new cases in the last three days and dividing it by the current total number of cases.  
+
+For example, if in Texas I had 300 new cases in the last three days, that would work out to an average of 100 cases per day.  If the total number of cases is already 1000, then my growth rate is 10%.  If the number of new cases holds steady until we get to 10,000 total cases in Texas, then the number of new cases--100 per day--is a growth rate of only 1%.
+
+If the rate holds steady at 10%, then when we get to 10,000 cases in Texas, we'll be seing about 1,000 new cases per day.  This is the kind of growth we are generally seeing.  But what I noticed
+is that the growth rate seems to have peaked just about everywhere and is on the decline.  What we were calling exponential growth no longer seems exponential.
+
+Here's what that chart looks like.
+
+```{r}
+cvdata.i18n %>% filter(Country %in% c('Italy', 'China, Hubei', 'Korea, South', 'US', 'Spain')) %>%
+  ggplot() +
+  aes(x=Date, y=Cases.Growth3, color=Country) +
+  geom_line() +
+  ggtitle("Growth Rate in Cases over Time") +
+  ylab("Daily Growth in Cases") +
+  scale_y_continuous(labels=percent) +
+  xlab(NULL)
+
+```
+
+You can see this rate trending toward zero.  In China and South Korea i'ts already pretty much leveled off at a point that represented a turnaround in both countries.  It was late February in China and the second week of March for South Korea.  The other countries seem to be on their way to zero.  
+
+What struck me about this was the last leg of these charts.  The decline in the growth rate seemed pretty steady, and almost linear.  So I thought, let's use a simple linear extrapolation over the last 14 days and use that to predict when the growth of new cases essentially stops.
+
+# International Predictions
+
+I started by analyzing several countries.  I took a cue from a chart in the Financial Times to compare these charts side by side starting from where the peak in growth rate occurs.  I plotted the growth rate for each of these countries and then plotted a linear model for the previous 14 days.  For Hubei and South Korea I omitted the history once their rates bottomed out.
+
+Then I used the linear model to predict on what date these countries will stop increasing new cases.
+
+```{r fig.width=6}
+
+# Step 0: Filter the left and right edge of the timeseries
+countries.filtered <- filter(cvdata.i18n, Cases > 100 & Country %in% c("China, Hubei", "Spain", "France", "Germany","Iran", "Italy", "Korea, South", "United Kingdom", "US")) %>%
+  mutate(Country = fct_relevel(Country, "China, Hubei", "Korea, South")) %>%
+  filter(!is.na(Population))
+
+peak_growth <- 
+  semi_join(countries.filtered, 
+            group_by(countries.filtered, Country) %>% summarize(Cases.Growth3 = max(Cases.Growth3)),
+            by=c('Country', 'Cases.Growth3')) %>%
+  select(Country, Date)
+
+target_growth <- 
+  filter(countries.filtered, Cases > 1000 & Cases.Growth3 < 0.014) %>%
+  group_by(Country) %>%
+  summarize(Date = min(Date))
+
+start_dates <- peak_growth$Date
+names(start_dates) <- peak_growth$Country
+
+end_dates <- target_growth$Date
+names(end_dates) <- target_growth$Country
+
+# Split the table of countries into separate tables per country
+countries.list <- split(countries.filtered, countries.filtered$Country)
+
+# Filter the dates of each country to include only dates after the peak growth in cases occur.
+countries.pred_window <- lapply(countries.list, function(table) {
+  country <- table$Country[1]
+  t <- table[table$Date >= start_dates[country] & 
+               (is.na(end_dates[country]) | table$Date < end_dates[country]),]
+  # Index this remaining data by Day, starting with the value Day = 1.
+  t$Day <- 1:nrow(t)
+  t
+})
+
+# Let's predict the peak
+extrapolate.lm <- function(df) {
+  t0 <- min(df$Date) 
+  model <- tail(df, 20) %>%
+    lm(formula = Cases.Growth3 ~ Day)
+  x_intercept <- ceiling(-model$coefficients[1]/model$coefficients[2])
+  prediction <- tibble(Country = df$Country[1],
+                       Day = 0:x_intercept)
+  p <- predict(model, prediction, se.fit = T)
+  prediction$Cases.Growth3 <- p$fit
+  prediction$Date <- t0 + days(round(prediction$Day))
+  prediction$Day.Upper <- prediction$Day + p$se.fit
+  prediction$Day.Lower <- prediction$Day - p$se.fit
+  prediction$Date.Upper <- t0 + ceiling(prediction$Day.Upper)
+  prediction$Date.Lower <- t0 + floor(prediction$Day.Lower)
+  return(prediction)
+}
+
+predictions.list <-lapply(countries.pred_window, extrapolate.lm)
+predictions <- bind_rows(predictions.list)
+predictions.target_day <- lapply(predictions.list, tail, 1) %>% bind_rows() %>%
+  mutate(Label = format(Date, "Peak cases %b %e"))
+
+
+# Rejoin the data
+country_data <- lapply(countries.list, function(table) {
+  country <- table$Country[1]
+  t <- filter(table, Date >= start_dates[country])
+  t$Day <- 1:nrow(t)
+  t
+}) %>% bind_rows()
+
+ggplot(country_data) +
+  aes(x=Day, y=Cases.Growth3, color=Country) +
+  geom_line(show.legend = F) +
+  geom_line(data=predictions, color='black', size=0.5, linetype=3) +
+  geom_vline(data=predictions.target_day, aes(xintercept = Day), color='darkgreen', size=0.5, alpha=0.5) +
+  geom_label(data=predictions.target_day, aes(label = Label, x = Day), y = 0.25, color='darkgreen', size=3) +
+  scale_y_continuous(labels=percent) +
+  facet_wrap('Country') +
+  theme(strip.text.x = element_text(face='bold', size=12)) +
+  ggtitle(paste0("National Trends as of ",format(end_date, "%B %e, %Y")), subtitle="Plotted individually from the first day of 5 recorded deaths") +
+  xlab("Days Since First 24 Deaths") +
+  ylab("Daily Increase in Cases")
+  
+```
+
+
+
+# State by State Predictions
+
+Then I turned to the US to see if I could go state by state.
+
+
+```{r fig.width=6}
+
+state_selection <-  c("New York", "Oregon", "California", "New Jersey", "Arizona", "Indiana",
+                      "Washington", "Louisiana", "Florida")
+training_window <- 20
+
+states.filtered <- filter(cvdata.us.by_state, Cases > 100 & Cases.Growth3 > 0.010) %>%
+  mutate(State = fct_drop(State))
+
+peak_growth <- 
+  semi_join(states.filtered, 
+            group_by(states.filtered, State) %>% summarize(Cases.Growth3 = max(Cases.Growth3)),
+            by=c('State', 'Cases.Growth3')) %>%
+  select(State, Date)
+
+start_dates <- peak_growth$Date
+names(start_dates) <- peak_growth$State
+
+# target_growth <- 
+#   filter(states.filtered, Cases > 1000 & Cases.Growth3 < 0.014) %>%
+#   group_by(State) %>%
+#   summarize(Date = min(Date))
+# end_dates <- target_growth$Date
+# names(end_dates) <- target_growth$State
+
+# Split the table of countries into separate tables per country
+states.list <- split(states.filtered, states.filtered$State)
+
+# Filter the dates of each country to include only dates after the peak growth in cases occur.
+states.pred_window <- lapply(states.list, function(table) {
+  state <- table$State[1]
+  t <- filter(table, Date >= start_dates[state])
+#               (is.na(end_dates[country]) | table$Date < end_dates[country]),]
+  # Index this remaining data by Day, starting with the value Day = 1.
+  t$Day <- 1:nrow(t)
+  t
+})
+
+# Let's predict the peak
+extrapolate.lm <- function(df) {
+  t0 <- min(df$Date) 
+  model <- tail(df, training_window) %>%
+    lm(formula = Cases.Growth3 ~ Day)
+  x_intercept <- ceiling(-model$coefficients[1]/model$coefficients[2])
+  prediction <- tibble(State = df$State[1],
+                       Day = 0:x_intercept)
+  p <- predict(model, prediction, se.fit = T)
+  prediction$Cases.Growth3 <- p$fit
+  prediction$Date <- t0 + days(round(prediction$Day))
+  prediction$Day.Upper <- prediction$Day + p$se.fit
+  prediction$Day.Lower <- prediction$Day - p$se.fit
+  prediction$Date.Upper <- t0 + ceiling(prediction$Day.Upper)
+  prediction$Date.Lower <- t0 + floor(prediction$Day.Lower)
+  return(prediction)
+}
+
+predictions.list <-lapply(states.pred_window, extrapolate.lm)
+predictions <- bind_rows(predictions.list) %>% 
+  filter(State %in% state_selection)
+predictions.target_day <- lapply(predictions.list, tail, 1) %>% 
+  bind_rows() %>%
+  mutate(Label = format(Date, "Peak cases %b %e")) %>% 
+  filter(State %in% state_selection)
+
+
+# Rejoin the data
+state_data <- lapply(states.list, function(table) {
+  country <- table$State[1]
+  t <- filter(table, Date >= start_dates[country])
+  t$Day <- 1:nrow(t)
+  t
+}) %>% bind_rows() %>%
+  filter(State %in% state_selection)
+
+ggplot(state_data) +
+  aes(x=Day, y=Cases.Growth3, color=State) +
+  geom_line(show.legend = F) +
+  geom_line(data=predictions, color='black', size=0.5, linetype=3) +
+  geom_vline(data=predictions.target_day, aes(xintercept = Day), linetype=5, color='darkgreen', size=0.5, alpha=0.5) +
+  geom_label(data=predictions.target_day, aes(label = Label, x = Day), nudge_x = -1, hjust = 1, y = 0.25, color='darkgreen', size=3) +
+  scale_y_continuous(labels=percent) +
+  facet_wrap('State') +
+  theme(strip.text.x = element_text(face='bold', size=12)) +
+  ggtitle(paste0("Predicted Peaks as of ",format(end_date, "%B %e, %Y")), subtitle=paste0("Linear extrapolation of last ", training_window, " days of new cases")) +
+  xlab("Days Since Peak in Growth") +
+  ylab("Rate of Growth of New Confirmed Cases")
+  
+```
+
+Finally, I ran a calculation on each state and put the results in a table.
+
+```{r}
+
+lapply(predictions.list, tail, 1) %>% 
+  bind_rows() %>%
+  mutate(Days.From.Now=Date - today()) %>%
+  select(State, Date, Days.From.Now) %>%
+  kable()
+
+```
+
+
