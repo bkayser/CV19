@@ -189,19 +189,19 @@ What's key to note is that the prediction for China and South Korea is pretty mu
 
 ```{r}
 
-lapply(predictions.country.list, tail, 1) %>% 
+data <- lapply(predictions.country.list, tail, 1) %>% 
   bind_rows() %>%
   mutate(Days.From.Now=Date - today()) %>%
   select(Country, Date, Days.From.Now) %>%
-  mutate(Date = format(Date, '%B %e')) %>%
-  kable()
+  mutate(Date = format(Date, '%B %e'))
+#write.csv(data, 'data/country-predictions-0411.csv')
+kable(data)
 
 ```
 
 # State by State Predictions
 
 Then I turned to the US to see if I could go state by state.
-
 
 ```{r fig.height=7, fig.width=10}
 
@@ -309,13 +309,13 @@ Finally, I ran a calculation on each state and put the results in a table.
 
 ```{r}
 
-lapply(predictions.state.list, tail, 1) %>% 
+data <- lapply(predictions.state.list, tail, 1) %>% 
   bind_rows() %>%
   mutate(Days.From.Now=Date - today()) %>%
   select(State, Date, Days.From.Now) %>%
-  mutate(Date = format(Date, '%B %e')) %>%
-  kable()
-
+  mutate(Date = format(Date, '%B %e')) 
+# write.csv(data, 'data/state-predictions-0411.csv')
+kable(data)
 ```
 
 # What's Next?
