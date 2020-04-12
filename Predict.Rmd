@@ -1,16 +1,17 @@
 ---
 title: "Prediction Using COVID-19 Data from Johns Hopkins"
 author: "Bill Kayser"
+date: "April 11, 2020"
 output:
   pdf_document: 
-    fig_height: 4
-    fig_width: 7
+    fig_height: 6
+    fig_width: 8
     toc: yes
-  html_document: default
   html_notebook: 
     fig_height: 6
     fig_width: 12
     toc: yes
+  html_document: default
 echo: TRUE
 ---
 
@@ -43,13 +44,16 @@ cvdata.i18n <- readRDS('data/cvdata.i18n.RDS')
 end_date <- max(cvdata.us$Date)
 ```
 
-This is an attempt to predict when recovery from the virus begins in different regions.  I did a lot of exploration to see if there were any 
-variables that I could normalize and model for prediction.  I looked at many charts of Confirmed Cases and Deaths as well as their first and second derivatives.  
-Data about Deaths is sparse, and the data about confirmed cases is unreliable. 
+# Introduction
+
+This is an attempt to predict when recovery from the virus begins in different regions.  Data in this report was pulled from several aggregators including primarily the 2019 Novel Coronavirus Visual Dashboard operated by the Johns Hopkins University Center for Systems Science and Engineering.
+I also pulled from the site CovidTracking.com.
+
+I did a lot of exploration to see if there were any variables that I could normalize and model for prediction.  I looked at many charts of Confirmed Cases and Deaths as well as their first and second derivatives.  Data about Deaths is sparse, and the data about confirmed cases is unreliable. 
 
 Confirmed Cases is the total number of confirmed cases since the start of the outbreak.  It does not take into account recoveries or deaths, and it never decreases.  The time series chart of Confirmed Cases looks like the following.
 
-```{r}
+```{r fig.height=3}
 cvdata.i18n %>% filter(Country %in% c('Italy', 'China, Hubei', 'Korea, South', 'US', 'Spain')) %>%
   ggplot() +
   aes(x=Date, y=Cases, color=Country) +
@@ -73,7 +77,7 @@ is that the growth rate seems to have peaked just about everywhere and is on the
 
 Here's what that chart looks like.
 
-```{r}
+```{r fig.height=3, fig.width=5}
 cvdata.i18n %>% filter(Country %in% c('Italy', 'China, Hubei', 'Korea, South', 'US', 'Spain')) %>%
   ggplot() +
   aes(x=Date, y=Cases.Growth3, color=Country) +
@@ -95,7 +99,9 @@ I started by analyzing several countries.  I took a cue from a chart in the Fina
 
 Then I used the linear model to predict on what date these countries will stop increasing new cases.
 
-```{r fig.width=6}
+I believe these dates represent when things will be at their worst.  There will be a relatively small number of new cases and the recoveries will have already kicked in, reducing the occupancy rates in hospitals.  
+
+```{r fig.width=10, fig.height=7}
 
 # Step 0: Filter the left and right edge of the timeseries
 countries.filtered <- filter(cvdata.i18n, Cases > 100 & Country %in% c("China, Hubei", "Spain", "France", "Germany","Iran", "Italy", "Korea, South", "United Kingdom", "US")) %>%
@@ -150,9 +156,9 @@ extrapolate.lm <- function(df) {
   return(prediction)
 }
 
-predictions.list <-lapply(countries.pred_window, extrapolate.lm)
-predictions <- bind_rows(predictions.list)
-predictions.target_day <- lapply(predictions.list, tail, 1) %>% bind_rows() %>%
+predictions.country.list <-lapply(countries.pred_window, extrapolate.lm)
+predictions.country <- bind_rows(predictions.country.list)
+predictions.country.target_day <- lapply(predictions.country.list, tail, 1) %>% bind_rows() %>%
   mutate(Label = format(Date, "Peak cases %b %e"))
 
 
@@ -167,29 +173,40 @@ country_data <- lapply(countries.list, function(table) {
 ggplot(country_data) +
   aes(x=Day, y=Cases.Growth3, color=Country) +
   geom_line(show.legend = F) +
-  geom_line(data=predictions, color='black', size=0.5, linetype=3) +
-  geom_vline(data=predictions.target_day, aes(xintercept = Day), color='darkgreen', size=0.5, alpha=0.5) +
-  geom_label(data=predictions.target_day, aes(label = Label, x = Day), y = 0.25, color='darkgreen', size=3) +
+  geom_line(data=predictions.country, color='black', size=0.5, linetype=3) +
+  geom_vline(data=predictions.country.target_day, aes(xintercept = Day), color='darkgreen', size=0.5, alpha=0.5) +
+  geom_label(data=predictions.country.target_day, aes(label = Label, x = Day), y = 0.25, color='darkgreen', size=3) +
   scale_y_continuous(labels=percent) +
   facet_wrap('Country') +
-  theme(strip.text.x = element_text(face='bold', size=12)) +
+  theme(strip.text.x = element_text(face='bold', size=9)) +
   ggtitle(paste0("National Trends as of ",format(end_date, "%B %e, %Y")), subtitle="Plotted individually from the first day of 5 recorded deaths") +
   xlab("Days Since First 24 Deaths") +
   ylab("Daily Increase in Cases")
   
 ```
 
+What's key to note is that the prediction for China and South Korea is pretty much right on.  The prediction line for other countries looks like a pretty good fit, and is particularly striking in France, Spain and the US.  
 
+```{r}
+
+lapply(predictions.country.list, tail, 1) %>% 
+  bind_rows() %>%
+  mutate(Days.From.Now=Date - today()) %>%
+  select(Country, Date, Days.From.Now) %>%
+  mutate(Date = format(Date, '%B %e')) %>%
+  kable()
+
+```
 
 # State by State Predictions
 
 Then I turned to the US to see if I could go state by state.
 
 
-```{r fig.width=6}
+```{r fig.height=7, fig.width=10}
 
 state_selection <-  c("New York", "Oregon", "California", "New Jersey", "Arizona", "Indiana",
-                      "Washington", "Louisiana", "Florida")
+                      "Washington", "South Dakota", "Florida")
 training_window <- 20
 
 states.filtered <- filter(cvdata.us.by_state, Cases > 100 & Cases.Growth3 > 0.010) %>%
@@ -242,10 +259,10 @@ extrapolate.lm <- function(df) {
   return(prediction)
 }
 
-predictions.list <-lapply(states.pred_window, extrapolate.lm)
-predictions <- bind_rows(predictions.list) %>% 
+predictions.state.list <-lapply(states.pred_window, extrapolate.lm)
+predictions.state <- bind_rows(predictions.state.list) %>% 
   filter(State %in% state_selection)
-predictions.target_day <- lapply(predictions.list, tail, 1) %>% 
+predictions.state.target_day <- lapply(predictions.state.list, tail, 1) %>% 
   bind_rows() %>%
   mutate(Label = format(Date, "Peak cases %b %e")) %>% 
   filter(State %in% state_selection)
@@ -263,28 +280,45 @@ state_data <- lapply(states.list, function(table) {
 ggplot(state_data) +
   aes(x=Day, y=Cases.Growth3, color=State) +
   geom_line(show.legend = F) +
-  geom_line(data=predictions, color='black', size=0.5, linetype=3) +
-  geom_vline(data=predictions.target_day, aes(xintercept = Day), linetype=5, color='darkgreen', size=0.5, alpha=0.5) +
-  geom_label(data=predictions.target_day, aes(label = Label, x = Day), nudge_x = -1, hjust = 1, y = 0.25, color='darkgreen', size=3) +
+  geom_line(data=predictions.state, color='black', size=0.5, linetype=3) +
+  geom_vline(data=predictions.state.target_day, aes(xintercept = Day), linetype=5, color='darkgreen', size=0.5, alpha=0.5) +
+  geom_label(data=predictions.state.target_day, aes(label = Label, x = Day), nudge_x = -1, hjust = 1, y = 0.25, color='darkgreen', size=3) +
   scale_y_continuous(labels=percent) +
   facet_wrap('State') +
-  theme(strip.text.x = element_text(face='bold', size=12)) +
+  theme(strip.text.x = element_text(face='bold', size=9)) +
   ggtitle(paste0("Predicted Peaks as of ",format(end_date, "%B %e, %Y")), subtitle=paste0("Linear extrapolation of last ", training_window, " days of new cases")) +
   xlab("Days Since Peak in Growth") +
-  ylab("Rate of Growth of New Confirmed Cases")
+  ylab("Rate of Growth of New Confirmed Cases") +
+  coord_cartesian(xlim=c(0, 40))
   
+```
+
+In South Dakota, things are so early that the rate of increase is unstable.  
+
+```{r fig.width=5, fig.height=2}
+filter(cvdata.us.by_state, State == 'South Dakota') %>% 
+  ggplot() +
+  aes(x = Date, y = Cases) +
+  geom_line() +
+  ggtitle("Growth Rate in South Dakota Over Time") +
+  xlab(NULL)
+
 ```
 
 Finally, I ran a calculation on each state and put the results in a table.
 
 ```{r}
 
-lapply(predictions.list, tail, 1) %>% 
+lapply(predictions.state.list, tail, 1) %>% 
   bind_rows() %>%
   mutate(Days.From.Now=Date - today()) %>%
   select(State, Date, Days.From.Now) %>%
+  mutate(Date = format(Date, '%B %e')) %>%
   kable()
 
 ```
 
+# What's Next?
+
+If I am going to keep developing this I'll probably try to mix in data on recoveries to see if I can predict the next milestone.  If this predicted milestone is when things are at their worst, the next milestone is when we've recovered enough to where restrictions can be loosened.
 

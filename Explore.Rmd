@@ -361,20 +361,25 @@ Total cases per 100K people: `r round(LP.Cases.Per100K$Cases.Per100K, 1)`
 # Scatter Plots
 
 Population Density vs. Infection Rate
-```{r}
+```{r fig.width=5}
 current_data <- filter(cvdata.us, Date == last_date & !is.na(Population.Density)) %>%
   mutate(Deaths.Per100K = Deaths * 100000 / Population)
-ggplot(current_data) +
-  aes(x=Cases.Diff3.Per100K) +
-  geom_histogram(bins=400) +
-  coord_cartesian(xlim=c(-10, 50))
+# ggplot(current_data) +
+#   aes(x=Cases.Diff3.Per100K) +
+#   geom_histogram(bins=400) +
+#   coord_cartesian(xlim=c(-10, 50))
+#       subtitle='Data from 2019 Novel Coronavirus Visual Dashboard operated by the Johns Hopkins University Center for Systems Science and Engineering',
 
 ggplot(filter(current_data, Deaths.Per100K > 0)) +
-  aes(x=Population.Density, y=Deaths.Per100K, show.legend=F) +
+  aes(x=Population.Density, y=Cases.Per100K, show.legend=F) +
   geom_point(size=0.2) +
-  geom_smooth(method='loess', color='red', size=0.5) +
+  geom_smooth(method='lm', formula = y ~ x, color='red', size=0.5) +
   scale_y_log10(labels=comma) + 
-  scale_x_log10() 
+  scale_x_log10() +
+  ggtitle('Confirmed Cases vs. Population Density, April 11, 2020',
+          subtitle='Data in Log Scale') +
+  xlab('Population per Mile') +
+  ylab('Cases per 100K population')
 ```
 
-
+d

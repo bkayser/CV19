@@ -38,7 +38,7 @@ source('utils.R')
 
 # Load Datasets
 
-We are pulling in data from the Johns Hopkins COVID-19 repository as well as world population data from wpp2019 and US Census information on county populations
+We are pulling in data from the github repo of the 2019 Novel Coronavirus Visual Dashboard operated by the Johns Hopkins University Center for Systems Science and Engineering, as well as world population data from wpp2019 and US Census information on county populations.
 
 ### COVID-19 Data
 
