@@ -3,13 +3,13 @@ title: "Prediction Using COVID-19 Data from Johns Hopkins"
 author: "Bill Kayser"
 date: "April 11, 2020"
 output:
-  pdf_document: 
-    fig_height: 6
-    fig_width: 8
-    toc: yes
   html_notebook: 
     fig_height: 6
     fig_width: 12
+    toc: yes
+  pdf_document: 
+    fig_height: 6
+    fig_width: 8
     toc: yes
   html_document: default
 echo: TRUE
