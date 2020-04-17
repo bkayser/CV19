@@ -203,10 +203,10 @@ kable(data)
 
 Then I turned to the US to see if I could go state by state.
 
-```{r fig.height=7, fig.width=10}
+```{r fig.height=3.5, fig.width=5}
 
 state_selection <-  c("New York", "Oregon", "California", "New Jersey", "Arizona", "Indiana",
-                      "Washington", "South Dakota", "Florida")
+                      "Rhode Island", "South Dakota", "Massachusetts")
 training_window <- 20
 
 states.filtered <- filter(cvdata.us.by_state, Cases > 100 & Cases.Growth3 > 0.010) %>%
@@ -276,7 +276,7 @@ state_data <- lapply(states.list, function(table) {
   t
 }) %>% bind_rows() %>%
   filter(State %in% state_selection)
-
+end_date <- max(state_data$Date)
 ggplot(state_data) +
   aes(x=Day, y=Cases.Growth3, color=State) +
   geom_line(show.legend = F) +

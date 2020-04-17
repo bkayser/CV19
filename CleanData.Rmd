@@ -57,6 +57,7 @@ cases <- read_and_clean('COVID-19/csse_covid_19_data/csse_covid_19_time_series/t
 deaths <- read_and_clean('COVID-19/csse_covid_19_data/csse_covid_19_time_series/time_series_covid19_deaths_US.csv')
 countries.cases <- read_and_clean('COVID-19/csse_covid_19_data/csse_covid_19_time_series/time_series_covid19_confirmed_global.csv')
 countries.deaths <- read_and_clean('COVID-19/csse_covid_19_data/csse_covid_19_time_series/time_series_covid19_deaths_global.csv')
+countries.recovered <- read_and_clean('COVID-19/csse_covid_19_data/csse_covid_19_time_series/time_series_covid19_recovered_global.csv')
 ```
 
 ### Load Census Data
@@ -73,13 +74,11 @@ For now I'm just going to use some data I picked up off the census web site in t
 regions <- c('Northeast', 'Midwest', 'South', 'West')
 divisions <- c('N Atlantic', 'Mid Atlantic', 'E North Ctrl', 'W North Ctrl', 'S Atlantic', 'E South Ctrl', 'W South Dtrl', 'Mountain', 'Pacific')
 
-geographic_data <- prep_geographic_data(read.csv('data/county_area.csv', skip=7)) 
-
 population_data <- read.csv('https://www2.census.gov/programs-surveys/popest/datasets/2010-2019/counties/totals/co-est2019-alldata.csv') %>% 
   mutate(Region = as.factor(regions[REGION]),
          Division = as.factor(divisions[DIVISION]),
          FIPS=as.integer(str_c(STATE,sprintf('%0.3i', COUNTY)))) %>%
-  left_join(geographic_data, by=c(STNAME='State', CTYNAME='County')) %>%
+  left_join(get_geographic_data(), by=c(STNAME='State', CTYNAME='County')) %>%
   select(Region,
          State=STNAME,
          Division,
@@ -148,7 +147,10 @@ cvdata.i18n <-
   left_join(select(countries.deaths, Key, Date, Deaths=Count),
             by=c('Key', 'Date')) %>%
   rename(Cases=Count) %>% 
-  calculate_differentials(c('Cases', 'Deaths'))
+  left_join(select(countries.recovered, -Lat, -Long, -Country), by=c('Key', 'Date')) %>%
+  rename(recovered=Count) %>%
+  calculate_differentials(c('Cases', 'Deaths')) %>%
+  add_estimated_recoveries()
   
 ```
 
@@ -172,7 +174,8 @@ cvdata.us.by_state <- cvdata.us %>%
   mutate(State.Code = fct_inorder(as.factor(State.Code)),
          State = fct_inorder(as.factor(State)),
          Infection.Rate = Cases.Diff * 1000000 / Population,
-         Death.Rate = Deaths.Diff * 1000000 / Population)
+         Death.Rate = Deaths.Diff * 1000000 / Population) %>%
+  add_estimated_recoveries()
 ```
 
 Create a single timeseries table just for Italy called `italy`.
@@ -181,6 +184,65 @@ Create a single timeseries table just for Italy called `italy`.
 italy <- cvdata.i18n %>%
   filter(Country == 'Italy') %>%
   select(-Key, -Lat, -Long, -Country) 
+
+```
+
+### Estimate Recoveries
+
+From **Report of the WHO-China Joint Mission on Coronavirus Disease 2019 (COVID-19)**
+
+    Using available preliminary data, the median time from onset to clinical recovery for mild
+    cases is approximately 2 weeks and is 3-6 weeks for patients with severe or critical disease.
+    Preliminary data suggests that the time period from onset to the development of severe
+    disease, including hypoxia, is 1 week. Among patients who have died, the time from
+    symptom onset to outcome ranges from 2-8 weeks. 
+
+https://www.who.int/docs/default-source/coronaviruse/who-china-joint-mission-on-covid-19-final-report.pdf
+
+Let's pick a distribution to estimate the recovery probability.
+
+There's not much to tell from the research.  I will assume most of the confirmed cases are not mild.  Normally
+mild cases are about 80% but I think our testing is biased toward people with severe symptoms.  
+
+I'll pick a gamma distribution with a mean of 4 weeks, a wide shape, and an offset of 10 days so there are no recoveries earlier than that.
+
+```{r}
+
+mean <- 20
+start <- 6
+scale  <- 6
+shape <- (mean - start) / scale
+x <- 1:nrow(df)
+
+quantiles <- pgamma(x-start, scale = scale, shape = shape)
+probabilities <- quantiles - c(0, quantiles[1:(length(quantiles)-1)]) 
+qplot(x, probabilities, geom='line') + geom_vline(xintercept=mean)
+
+```
+
+Now let's go back over the confirmed cases and project their recoveries based on the normal dist.
+
+```{r fig.width=6, fig.height=3}
+gather(cvdata.us.by_state, key='Measure', value='Recoveries', 'Recovered', 'Est.Recovered', 'Cases') %>%
+  filter(State %in% c('Arizona', 'Texas', 'District of Columbia', 'Kentucky', 'Oklahoma', 'Arkansas')) %>%
+  ggplot() +
+  aes(x=Date, y=Recoveries, linetype=Measure, color=State)+
+  geom_line() +
+  coord_cartesian(xlim = c(mdy('03-25-2020'), today()))+
+  facet_wrap('State') +
+  scale_y_continuous(labels=comma)
+```
+
+```{r fig.width=6, fig.height=5}
+
+gather(cvdata.i18n, key='Measure', value='Recoveries', 'Recovered', 'Est.Recovered', 'Cases') %>%
+  filter(Country %in% c('Australia', 'Hubei - China', 'France', 'Italy', 'Spain', 'US', 'Germany', 'Austria', 'Russia', 'Korea, South')) %>%
+ggplot() +
+  aes(x=Date, y=Recoveries, linetype=Measure, color=Country)+
+  geom_line() +
+  coord_cartesian(xlim = c(mdy('02-25-2020'), today())) +
+  facet_wrap('Country') +
+  scale_y_log10(labels=comma)
 
 ```
 # Save the Data

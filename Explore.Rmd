@@ -222,16 +222,12 @@ labels <- lapply(d2, tail, 1) %>% bind_rows()
 
 country_data <- bind_rows(d2)
 
+#recovery_data <- country_data %>%
+#  gather(key = 'Measure', value = 'Count', 'Cases', 'recovered.est', 'recovered')
+
 g <- ggplot(country_data) +
-  aes(x=Day, color=Country) +
+  aes(x=Day) +
   geom_line(show.legend = F) +
-  geom_text(data=labels, 
-            mapping=aes(label=Country),
-            show.legend = F,
-            nudge_x = 0.5,
-            check_overlap = F,
-            size=3,
-            hjust = 0) +
   coord_cartesian(xlim=c(0, max(labels$Day) + 15)) +
   ggtitle(paste0("National Trends as of ",format(end_date, "%B%e, %Y")), subtitle="Plotted individually from the first day of 5 recorded deaths") +
   xlab("Days Since First 24 Deaths") +

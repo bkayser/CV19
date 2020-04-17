@@ -85,7 +85,39 @@ calculate_differentials <- function(infection_data, target_variables) {
   return(infection_data)
 }
 
-prep_geographic_data <- function(data) {
+add_estimated_recoveries <- function(data) {
+
+  mean <- 20
+  start <- 6
+  scale  <- 6
+  shape <- (mean - start) / scale
+  x <- 1:nrow(df)
+  
+  quantiles <- pgamma(x-start, scale = scale, shape = shape)
+  probabilities <- quantiles - c(0, quantiles[1:(length(quantiles)-1)]) 
+  # qplot(x, probabilities, geom='line') + geom_vline(xintercept=mean)
+  
+  data.list <- split(data, data$Key)
+  
+  estimate_recoveries <- function(df) {
+    df <- arrange(df, Date)
+    df$recovered.est <- 0
+    for (i in 1:nrow(df)) {
+      cases <- df$Cases[i]
+      new_recoveries <- cases * probabilities
+      projected_range <- i:nrow(df)
+      df[projected_range, 'recovered.est'] <- df[projected_range, 'recovered.est'] + new_recoveries[1:length(projected_range)]
+    }
+    return(mutate(df, recovered.est = round(recovered.est)))
+  }
+  lapply(data.list, estimate_recoveries) %>% 
+    bind_rows() %>%
+    rename(Recovered=recovered, Est.Recovered=recovered.est)
+}
+
+
+get_geographic_data <- function() {
+  data <- read.csv('data/county_area.csv', skip=7)
   state_names <- as.character(read.csv('data/state_abbrev.csv')$State)
   
   for (i in 1:nrow(data)) {
