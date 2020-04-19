@@ -91,7 +91,7 @@ add_estimated_recoveries <- function(data) {
   start <- 6
   scale  <- 6
   shape <- (mean - start) / scale
-  x <- 1:nrow(df)
+  x <- 1:nrow(data)
   
   quantiles <- pgamma(x-start, scale = scale, shape = shape)
   probabilities <- quantiles - c(0, quantiles[1:(length(quantiles)-1)]) 
@@ -132,3 +132,20 @@ get_geographic_data <- function() {
            County = as.character(County))
   
 }
+
+counties <- unique(az$County)
+dates <- seq(mdy('03-25-2020'), by=1, length.out = length(counties))
+names(dates) <- counties
+
+labels <- filter(az, Date == dates[County])
+
+ggplot(filter(az, Cases.Per100K > 0.1)) + 
+  aes(x = Date, y = Cases.Per100K, color=County, linetype=County) + 
+  geom_line(show.legend=F) + 
+  coord_cartesian(xlim=c(mdy('03-24-2020'), date())) + 
+#  scale_y_log10() + 
+  geom_text(data=labels, aes(x=Date, y=Cases.Per100K, label=County), show.legend = F, nudge_y = 8)
+  
+  
+  
+  

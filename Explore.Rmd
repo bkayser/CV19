@@ -18,9 +18,13 @@ echo: TRUE
 ```{r results='hide', message=F, include=F}
 library(tidyverse)
 library(scales)
-theme_set(theme_light())
+library(caTools)
 source('utils.R')
 knitr::opts_chunk$set(echo=F)
+theme_set(theme_stata())
+
+library(ggthemes)
+
 ```
 
 
@@ -378,4 +382,87 @@ ggplot(filter(current_data, Deaths.Per100K > 0)) +
   ylab('Cases per 100K population')
 ```
 
-d
+
+```{r, fig.height=7, fig.width=4}
+
+testdata.ts <- cvdata.us.by_state %>%
+  mutate(Test.Positive.Rate = positive/(positive + negative),
+         Tests = positive + negative,
+         Tests.Per.Capita = 100000 * Tests/Population) %>%
+  arrange(desc(Test.Positive.Rate)) 
+
+testdata <- testdata.ts %>%
+  filter(Date==max(cvdata.us.by_state$Date)) %>%
+  mutate(State = fct_reorder(State, Tests.Per.Capita))  
+
+
+ggplot(testdata) +
+  aes(x=State.Code, y=Tests.Per.Capita, fill=Region) +
+  geom_bar(stat='identity') +
+  scale_y_continuous(labels=comma, position='right') +
+  ggtitle('Tests conducted per 100K population') +
+  coord_flip() 
+
+testdata$State = fct_reorder(testdata$State, testdata$Test.Positive.Rate)
+
+ggplot(testdata) +
+  aes(x=State, y=Test.Positive.Rate, fill=Region) +
+  geom_bar(stat='identity') +
+  scale_y_continuous(labels=percent, position='right') +
+  coord_flip() 
+
+```
+
+```{r, fig.width=5, fig.height=4}
+
+window_width <- 4
+timerange <- 28
+history <- filter(testdata.ts, 
+                  !is.na(totalTestResultsIncrease) &                  # Filter missing values
+                    totalTestResultsIncrease > 0 &                    # Filter missing values
+                    Date > today() - days(timerange))                 # Recent data only
+history.1 <- split(history, history$State) %>% lapply(function(df) {
+  arrange(df, Date) %>%
+  mutate(positiveRate = positiveIncrease / totalTestResultsIncrease,
+         positiveRateMA = runmean(positiveIncrease, k = window_width, endrule='NA', align='right') /
+           runmean(totalTestResultsIncrease, k = window_width, endrule='NA', align='right'))
+}) %>% 
+  bind_rows() %>%
+  filter(positiveRateMA < 0.55)  # Remove outliers
+
+df <- filter(history.1, State %in% c('Indiana', 'California', 'Arizona', 'Oregon', 'New York')) 
+#filter(history.1, State %in% c('California', 'Maine', 'New Jersey')) %>% 
+#  select(State, Date, contains('Increase'), contains('Rate')) %>% view()
+
+g <- split(history.1, history.1$Region) %>% 
+  lapply(function(df) {
+    df.current <- filter(df, Date == max(df$Date))
+    ggplot(df) +
+      aes(x=Tests.Per.Capita, y=positiveRateMA, color=State) +
+      ggtitle(subtitle = paste0(window_width, ' day moving average over last ', timerange, ' days'),
+              paste0('Per Capita Testing vs. Test Positive Rate for States in ', df$Region[1], ' Region')) +
+      xlab('Tests per 100K Population') +
+      ylab('Rate of Positive Tests') +
+      geom_line(show.legend = F, size=0.2) +
+      geom_point(show.legend = F, size=0.6) +
+      scale_y_continuous(labels=percent) +
+      geom_label(data=df.current, aes(label=State.Code), show.legend=F) +
+      coord_cartesian(xlim=c(0, 3000)) 
+  }) 
+
+
+```
+
+Arizona Counties
+
+```{r}
+filter(cvdata.us, State == 'Arizona' & Cases.Per100K > 0.1) %>%
+  ggplot() +
+  aes(x = Date, y = Cases.Per100K, color=County, linetype=County) + 
+  geom_line(show.legend=F) + 
+  coord_cartesian(xlim=c(mdy('03-24-2020'), date())) + 
+  #  scale_y_log10() + 
+  geom_text(data=labels, aes(x=Date, y=Cases.Per100K, label=County), show.legend = F, nudge_y = 8)
+
+```
+

@@ -128,6 +128,7 @@ cvdata.us <- left_join(cases,
   mutate(State = as.factor(State), 
          County = as.factor(County)) %>%
   calculate_differentials(c('Cases', 'Deaths'))
+
 ```
 
 Join the cases and deaths for country data into a single table, `cvdata.i18n`.
@@ -149,8 +150,9 @@ cvdata.i18n <-
   rename(Cases=Count) %>% 
   left_join(select(countries.recovered, -Lat, -Long, -Country), by=c('Key', 'Date')) %>%
   rename(recovered=Count) %>%
-  calculate_differentials(c('Cases', 'Deaths')) %>%
-  add_estimated_recoveries()
+  add_estimated_recoveries() %>%
+  calculate_differentials(c('Cases', 'Deaths'))
+
   
 ```
 
@@ -176,6 +178,12 @@ cvdata.us.by_state <- cvdata.us %>%
          Infection.Rate = Cases.Diff * 1000000 / Population,
          Death.Rate = Deaths.Diff * 1000000 / Population) %>%
   add_estimated_recoveries()
+
+ggplot(filter(cvdata.us.by_state, Region=='Northeast' & State=='New York')) +
+  aes(x=Date, linetype=State, y=positive) +
+  geom_line(color='green') +
+  geom_line(aes(y=negative), color='red')  +
+  geom_line(aes(y=positiveIncrease), color='black')
 ```
 
 Create a single timeseries table just for Italy called `italy`.
@@ -212,7 +220,7 @@ mean <- 20
 start <- 6
 scale  <- 6
 shape <- (mean - start) / scale
-x <- 1:nrow(df)
+x <- 1:60
 
 quantiles <- pgamma(x-start, scale = scale, shape = shape)
 probabilities <- quantiles - c(0, quantiles[1:(length(quantiles)-1)]) 
@@ -224,7 +232,7 @@ Now let's go back over the confirmed cases and project their recoveries based on
 
 ```{r fig.width=6, fig.height=3}
 gather(cvdata.us.by_state, key='Measure', value='Recoveries', 'Recovered', 'Est.Recovered', 'Cases') %>%
-  filter(State %in% c('Arizona', 'Texas', 'District of Columbia', 'Kentucky', 'Oklahoma', 'Arkansas')) %>%
+  filter(!is.na(Recoveries) & State %in% c('Arizona', 'Texas', 'District of Columbia', 'Kentucky', 'Oklahoma', 'Arkansas')) %>%
   ggplot() +
   aes(x=Date, y=Recoveries, linetype=Measure, color=State)+
   geom_line() +
@@ -236,7 +244,7 @@ gather(cvdata.us.by_state, key='Measure', value='Recoveries', 'Recovered', 'Est.
 ```{r fig.width=6, fig.height=5}
 
 gather(cvdata.i18n, key='Measure', value='Recoveries', 'Recovered', 'Est.Recovered', 'Cases') %>%
-  filter(Country %in% c('Australia', 'Hubei - China', 'France', 'Italy', 'Spain', 'US', 'Germany', 'Austria', 'Russia', 'Korea, South')) %>%
+  filter(Recoveries > 0 & Country %in% c('Australia', 'Hubei - China', 'France', 'Italy', 'Spain', 'US', 'Germany', 'Austria', 'Russia', 'Korea, South')) %>%
 ggplot() +
   aes(x=Date, y=Recoveries, linetype=Measure, color=Country)+
   geom_line() +
@@ -245,6 +253,8 @@ ggplot() +
   scale_y_log10(labels=comma)
 
 ```
+
+
 # Save the Data
 
 ```{r echo=T}
