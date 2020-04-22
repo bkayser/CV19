@@ -21,7 +21,7 @@ library(scales)
 library(caTools)
 source('utils.R')
 knitr::opts_chunk$set(echo=F)
-theme_set(theme_stata())
+theme_set(theme_fivethirtyeight())
 
 library(ggthemes)
 
@@ -71,7 +71,9 @@ if (breaks[1] != start_date) {
 cvdata.us %>%
   filter(!is.na(Division) & Date == end_date) %>%
   arrange(desc(Cases.Per100K)) %>%
-  select(Key, Cases.Per100K, Deaths) %>%
+  mutate(Cases.Per100K = signif(round(Cases.Per100K), 3),
+         Deaths.Per100K = signif(round(Deaths.Per100K), 2)) %>%
+  select(Key, Cases.Per100K, Deaths.Per100K) %>%
   top_n(25) %>% knitr::kable()
 ```
 
@@ -139,6 +141,54 @@ g <- cvdata.us.by_state %>%
 
 g + scale_y_continuous(labels=comma) 
 g + scale_y_log10(labels=comma) + labs(subtitle="Log Scale")
+```
+
+
+### Confirmed Cases per Capita
+
+```{r fig.width=5, fig.height=4}
+cvdata.us.by_state %>% 
+  arrange(desc(Date)) %>%
+  group_by(State.Code) %>%
+  summarize(Cases.Per100K = first(Cases.Per100K)) %>% 
+  ggplot() +
+  aes(x=reorder(State.Code, Cases.Per100K), y=Cases.Per100K, fill=Cases.Per100K) +
+  geom_col() +
+  scale_fill_gradient(low='#00FFAA', high='red', trans='log10') +
+  scale_y_continuous(position = 'right') +
+  geom_text(aes(label=round(Cases.Per100K)), size=4, nudge_y=30) +
+  coord_flip() + # +  scale_y_log10()
+  theme(line = element_blank(), 
+        panel.border = element_blank(),
+        axis.text.x = element_blank(),
+        legend.position=c(0.5,0.5))
+
+```
+
+```{r fig.width=5, fig.height=4}
+
+top_countries <- cvdata.i18n %>%
+  arrange(desc(Date)) %>%
+  group_by(Key) %>%
+  summarize(Cases.Per100K = first(Cases.Per100K)) %>%
+  arrange(desc(Cases.Per100K)) %>%
+  head(50)
+
+ggplot(top_countries) +
+  aes(x=reorder(Key, Cases.Per100K), y=Cases.Per100K, fill=Cases.Per100K) +
+  geom_col() +
+  scale_fill_gradient(low='#00FFAA', high='red', trans='log10') +
+  geom_text(aes(label=round(Cases.Per100K)), size=4, nudge_y=30) +
+  coord_flip() +  
+  xlab(NULL) +
+  ylab('Cases per 100K Population') +
+  ggtitle('Countries Ranked by Per Capita Infection Rate') +
+  theme(line = element_blank(), 
+        panel.border = element_blank(),
+        axis.text.x = element_blank(),
+        legend.position=c(0.5,0.5))
+  #scale_y_log10()
+
 ```
 
 ### Deaths, grouped by State.
@@ -264,9 +314,9 @@ today <- mutate(today, State.Code = fct_relevel(State.Code, names(averages.by_st
 
 ggplot(today) +
   aes(x = State.Code, y = Cases.Rate, fill = Region) +
-  coord_flip(ylim=c(0,2000)) +
   geom_boxplot() +
-ggtitle("")
+  coord_flip(ylim=c(0,3000)) +
+  ggtitle("")
 ```
 
 ### Infections Per Capita
@@ -292,7 +342,7 @@ cvdata.us.by_state %>%
 data <- cvdata.us.by_state %>% filter(Date == last_date)
 
 ggplot(data) +
-  aes(x=Division, y=Deaths.Per100K, fill=Division) +
+  aes(x=Region, y=Deaths.Per100K, fill=Region) +
   geom_boxplot() +
 #  scale_y_log10(labels=comma) +
 #  scale_x_discrete(labels=NULL) +
@@ -383,7 +433,7 @@ ggplot(filter(current_data, Deaths.Per100K > 0)) +
 ```
 
 
-```{r, fig.height=7, fig.width=4}
+```{r fig.width=5, fig.height=4}
 
 testdata.ts <- cvdata.us.by_state %>%
   mutate(Test.Positive.Rate = positive/(positive + negative),
@@ -409,7 +459,11 @@ ggplot(testdata) +
   aes(x=State, y=Test.Positive.Rate, fill=Region) +
   geom_bar(stat='identity') +
   scale_y_continuous(labels=percent, position='right') +
-  coord_flip() 
+  coord_flip(ylim=c(0,0.55))  +
+  theme(line = element_blank(), 
+        panel.border = element_blank(),
+        axis.text.x = element_blank(),
+        legend.position=c(0.5,0.5))
 
 ```
 

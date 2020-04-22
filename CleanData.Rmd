@@ -100,10 +100,9 @@ states <- filter(population_data, CountyCode == 0) %>% select(-CountyCode)
 This site has an aggregation of data about testing.  It's pretty messy data but we can join what there is to state level historical data.
 
 ```{r}
-state_abbreviations <- read.csv('data/state_abbrev.csv') %>% select(State, State.Code=Code)
+
 covid.testing <- read.csv('https://covidtracking.com/api/v1/states/daily.csv') %>% 
   as_tibble() %>%
-  left_join(state_abbreviations, by=c(state='State.Code')) %>%
   rename(State.Code=state, Date=date) %>%
   mutate(Date = as.Date(as.POSIXct(strptime(as.character(Date), format='%Y%m%d'))))
 ```
@@ -117,6 +116,7 @@ Start combining tables with external data.  Also invokes `calculate_differential
 Join the US confirmed cases to deaths and census population data.  Create a single table, `cvdata.us`.
 
 ```{r}
+state_abbreviations <- read.csv('data/state_abbrev.csv') %>% select(State, State.Code=Code)
 cvdata.us <- left_join(cases, 
                        select(deaths, Key, Date, Count),
                        by=c('Key', 'Date')) %>%
@@ -152,8 +152,6 @@ cvdata.i18n <-
   rename(recovered=Count) %>%
   add_estimated_recoveries() %>%
   calculate_differentials(c('Cases', 'Deaths'))
-
-  
 ```
 
 ### Derive Additional Tables
@@ -162,28 +160,24 @@ Group data by state and save into table `cvdata.us.by_state`.
 
 ```{r, message=F}
 cvdata.us.by_state <- cvdata.us %>%
-  group_by(State, Date) %>%
+  group_by(State, State.Code, Date) %>%
   summarize(Cases = sum(Cases),
             Key = first(State),
             Deaths = sum(Deaths))%>%
   ungroup(State, Date) %>%
-  left_join(states, by=c('State')) %>% mutate(State = as.factor(State)) %>%
-  filter(!is.na(Region))  %>%
-  # Join with the testing data
-  left_join(covid.testing, by=c('State', 'Date')) %>%
+  left_join(states, by=c('State')) %>%
+  mutate(State = as.factor(State)) %>%
+  filter(!is.na(Region)) %>%
+  left_join(covid.testing, by=c('State.Code', 'Date')) %>%
   select(-hash, -dateChecked, -fips, -CTYNAME) %>% 
   calculate_differentials(c('Cases', 'Deaths')) %>%
   mutate(State.Code = fct_inorder(as.factor(State.Code)),
          State = fct_inorder(as.factor(State)),
          Infection.Rate = Cases.Diff * 1000000 / Population,
          Death.Rate = Deaths.Diff * 1000000 / Population) %>%
-  add_estimated_recoveries()
+  add_estimated_recoveries() %>%
+  select(Key, State, State.Code, Region, Division, Date, starts_with('Cases'), starts_with('Deaths'), contains('Recovered'), matches('^[A-Z]', ignore.case=F), -FIPS, everything())
 
-ggplot(filter(cvdata.us.by_state, Region=='Northeast' & State=='New York')) +
-  aes(x=Date, linetype=State, y=positive) +
-  geom_line(color='green') +
-  geom_line(aes(y=negative), color='red')  +
-  geom_line(aes(y=positiveIncrease), color='black')
 ```
 
 Create a single timeseries table just for Italy called `italy`.
