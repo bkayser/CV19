@@ -1,5 +1,5 @@
 ---
-title: "Cleaning COVID-19 Data from Johns Hopkins"
+title: "Report on United States and Covid19 Pandemic"
 author: "Bill Kayser"
 output:
   html_notebook: 
@@ -19,14 +19,13 @@ echo: TRUE
 library(tidyverse)
 library(scales)
 library(caTools)
+library(ggthemes)
 source('utils.R')
 knitr::opts_chunk$set(echo=F)
 theme_set(theme_fivethirtyeight())
-
 library(ggthemes)
 
 ```
-
 
 <style type="text/css">
 .table {
@@ -44,16 +43,9 @@ library(ggthemes)
 ```{r echo=T}
 cvdata.us <- readRDS('data/cvdata.us.RDS')
 cvdata.us.by_state <- readRDS('data/cvdata.us.by_state.RDS')
-cvdata.i18n <- readRDS('data/cvdata.i18n.RDS')
-```
 
-# Data Exploration
+# Let's first set up some parameters for the graph's X axis.
 
-For the US Data I'm just showing a few states so the plots are more readable.  This is just preliminary exploration as I get to know the data and clean it for other purposes.
-
-Let's first set up some parameters for the graph's X axis.
-
-```{r}
 start_date <- mdy('02/26/2020')
 end_date <- max(cvdata.us$Date)
 breaks <- seq(end_date,
@@ -65,70 +57,38 @@ if (breaks[1] != start_date) {
 }
 ```
 
-### Top Counties Infected
+# Overview of Counties
 
+
+### Top Counties in Cases per Capita:
 ```{r}
 cvdata.us %>%
-  filter(!is.na(Division) & Date == end_date) %>%
+  filter(!is.na(Division) & Date == end_date & Population > 5000) %>%
   arrange(desc(Cases.Per100K)) %>%
-  mutate(Cases.Per100K = signif(round(Cases.Per100K), 3),
-         Deaths.Per100K = signif(round(Deaths.Per100K), 2)) %>%
   select(Key, Cases.Per100K, Deaths.Per100K) %>%
-  top_n(25) %>% knitr::kable()
+  top_n(25) %>% knitr::kable(col.names=c('County', 'Cases Per 100K', 'Deaths Per 100K'))
 ```
 
-### Reporting Anomalies
 
-Consider the growth in deaths and cases, county by county, on each day of the week when there are at least 100 active confirmed cases.
 
+### Top Counties in Deaths per Capita:
 ```{r}
-cvdata.daily <- cvdata.us %>%
-  filter(Cases > 100) %>%
-  mutate(day.of.week = factor(strftime(Date, '%A'), levels = c('Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday')),
-         Cases.Growth = Cases.Diff / Cases,
-         Deaths.Growth = ifelse(Deaths == 0, 0, Deaths.Diff / Deaths))
+cvdata.us %>%
+  filter(!is.na(Division) & Date == end_date & Population > 1000) %>%
+  arrange(desc(Deaths.Per100K)) %>%
+  select(Key,Deaths.Per100K) %>%
+  top_n(25) %>% knitr::kable(col.names=c('County', 'Deaths Per 100K'))
 ```
 
-What is the typical change in Confirmed Cases and Deaths on any day of the week?
-
-```{r}
-group_by(cvdata.daily, day.of.week) %>%
-  summarize(Cases.Growth.Mean = percent(mean(Cases.Growth)),
-            Deaths.Growth.Mean = percent(mean(Deaths.Growth, na.rm=T)))
-
-ggplot(cvdata.daily) +
-  aes(x=day.of.week, y = Cases.Growth) +
-  geom_boxplot() +
-  xlab('Day of Week') +
-  ylab('Growth in Cases') +
-  scale_y_continuous(labels=percent)
-```
-
-
-### Top Countries infected
-
-```{r top_countries, fig.width=5}
-max_date <- max(cvdata.i18n$Date)
-countries <- 
-  filter(cvdata.i18n, Date == max_date) %>%
-  arrange(desc(Cases)) %>% 
-  head(10)
-
-ggplot(countries) +
-  aes(fill=Country,
-      x=Country,
-      y=Cases) +
-  geom_col(show.legend=F) +
-  scale_y_continuous(labels=comma) +
-  xlab(NULL)
-```
-
-### Confirmed Cases Grouped by State
+## Confirmed Case History in Top 10 States
 
 ```{r echo=F}
+cvdata.us.current <- filter(cvdata.us.by_state, Date == end_date)
+Cases.top.10 <- arrange(cvdata.us.current, desc(Cases)) %>% head(10) %>% pull(State) %>% droplevels() 
+
 g <- cvdata.us.by_state %>%
-  filter((State %in% c('New York', 'Oregon', 'Indiana', 'California'))) %>%
-  mutate(State=factor(as.character(State))) %>%
+  filter(State %in% Cases.top.10) %>%
+  mutate(State = factor(State, Cases.top.10)) %>%
   arrange(State, Date) %>%
   filter( Cases > 0) %>%
   ggplot() +
@@ -144,73 +104,50 @@ g + scale_y_log10(labels=comma) + labs(subtitle="Log Scale")
 ```
 
 
-### Confirmed Cases per Capita
+## Deaths in Top 10 States
 
-```{r fig.width=5, fig.height=4}
-cvdata.us.by_state %>% 
-  arrange(desc(Date)) %>%
-  group_by(State.Code) %>%
-  summarize(Cases.Per100K = first(Cases.Per100K)) %>% 
-  ggplot() +
-  aes(x=reorder(State.Code, Cases.Per100K), y=Cases.Per100K, fill=Cases.Per100K) +
-  geom_col() +
-  scale_fill_gradient(low='#00FFAA', high='red', trans='log10') +
-  scale_y_continuous(position = 'right') +
-  geom_text(aes(label=round(Cases.Per100K)), size=4, nudge_y=30) +
-  coord_flip() + # +  scale_y_log10()
-  theme(line = element_blank(), 
-        panel.border = element_blank(),
-        axis.text.x = element_blank(),
-        legend.position=c(0.5,0.5))
+```{r echo=F}
+cvdata.us.current <- filter(cvdata.us.by_state, Date == end_date)
+Deaths.top.10 <- arrange(cvdata.us.current, desc(Deaths)) %>% head(10) %>% pull(State) %>% droplevels() 
 
-```
-
-```{r fig.width=5, fig.height=4}
-
-top_countries <- cvdata.i18n %>%
-  arrange(desc(Date)) %>%
-  group_by(Key) %>%
-  summarize(Cases.Per100K = first(Cases.Per100K)) %>%
-  arrange(desc(Cases.Per100K)) %>%
-  head(50)
-
-ggplot(top_countries) +
-  aes(x=reorder(Key, Cases.Per100K), y=Cases.Per100K, fill=Cases.Per100K) +
-  geom_col() +
-  scale_fill_gradient(low='#00FFAA', high='red', trans='log10') +
-  geom_text(aes(label=round(Cases.Per100K)), size=4, nudge_y=30) +
-  coord_flip() +  
-  xlab(NULL) +
-  ylab('Cases per 100K Population') +
-  ggtitle('Countries Ranked by Per Capita Infection Rate') +
-  theme(line = element_blank(), 
-        panel.border = element_blank(),
-        axis.text.x = element_blank(),
-        legend.position=c(0.5,0.5))
-  #scale_y_log10()
-
-```
-
-### Deaths, grouped by State.
-
-```{r, echo=F}
 g <- cvdata.us.by_state %>%
-  filter((State %in% c('New York', 'Oregon', 'Indiana', 'California'))) %>%
-  mutate(State=fct_drop(State)) %>%
+  filter(State %in% Deaths.top.10) %>%
+  mutate(State = factor(State, Deaths.top.10)) %>%
   arrange(State, Date) %>%
   filter( Deaths > 0) %>%
   ggplot() +
-  aes(Date, Deaths, color=State) + 
+  aes(Date, Deaths, color=State) +
+  ggtitle('COVID-19 Deaths by States') +
   geom_line() + 
-  ggtitle('COVID-19 Deaths by State') +
   xlab(NULL) +
   coord_cartesian(xlim=c(start_date, end_date)) +
   scale_x_date(breaks=breaks, date_labels = '%m/%d', date_minor_breaks='1 day')
 
 g + scale_y_continuous(labels=comma) 
-g + scale_y_log10(labels=comma) + labs(subtitle = 'Log Scale') 
+g + scale_y_log10(labels=comma) + labs(subtitle="Log Scale")
+```
+
+
+### Confirmed Cases per Capita
+
+```{r fig.width=5, fig.height=4}
+cvdata.us.current %>% 
+  ggplot() +
+  aes(x=reorder(State.Code, Cases.Per100K), y=Cases.Per100K, fill=Cases.Per100K) +
+  geom_col(show.legend=F) +
+  scale_fill_gradient(low='#00FFAA', high='red', trans='log10') +
+  scale_y_continuous(position = 'right') +
+  geom_text(aes(label=round(Cases.Per100K)), size=4, nudge_y=30) +
+  coord_flip() + # +  scale_y_log10()
+  ylab('Cases per 100K Population') +
+  xlab(NULL) +
+  theme(line = element_blank(), 
+        panel.border = element_blank(),
+        axis.text.x = element_blank(),
+        legend.position=c(0.5,0.5))
 
 ```
+
 
 ### Change in Confirmed Cases
 
@@ -219,22 +156,20 @@ This plot shows the day to day change in confirmed cases.  This is important bec
 Right now you can see New York is a long way from that but the LOESS trend line shows it starting to trend downward.
 
 
-```{r echo=F}
-g <- cvdata.us %>%
-  filter(State %in% c('New York', 'Oregon', 'Indiana', 'California')) %>%
-  mutate(State = fct_drop(State)) %>%
-  group_by(State, Date) %>%
-  summarize(Cases.Diff3 = sum(Cases.Diff3)) %>%
+```{r echo=F, fig.height=4, fig.width=5}
+g <- cvdata.us.by_state %>%
+  filter(State %in% Cases.top.10[1:5]) %>%
+  mutate(State = factor(State, levels=Cases.top.10[1:5])) %>%
   arrange(State, Date) %>%
   ggplot() +
+  aes(Date, Cases.Diff3, color=State, fill=State) +
   geom_line() + 
-  geom_smooth(method='loess', span=0.2, size=0.5, linetype=3) +
-  ggtitle('COVID-19 Confirmed Cases Day to Day Change, by States',
+  geom_smooth(alpha=0.1, method='lm', formula= y ~ poly(x,5), fullrange=T, span=0.2, size=0.5, linetype=3) +
+  ggtitle('Cases Day to Day Change in Top 5 States',
           subtitle = str_c("Reported data through ", format(max(cvdata.us$Date), "%B %d, %Y"))) +
-  aes(Date, Cases.Diff3, color=State) +
   ylab("Daily Increase") +
   xlab(NULL)  +
-  coord_cartesian(xlim=c(start_date, end_date)) +
+  coord_cartesian(xlim=c(ymd('2020-03-15'), end_date)) +
   scale_x_date(breaks=breaks, date_labels = '%m/%d', date_minor_breaks='1 day')
 g
 
@@ -257,50 +192,6 @@ cvdata.us.by_state %>%
   scale_x_date(breaks=breaks, date_labels = '%m/%d', date_minor_breaks='1 day')
 
 ```
-
-
-### International Cases
-
-```{r fig.width=6}
-d0 <- filter(cvdata.i18n, Deaths >= 5 & Country %in% c("China, Hubei", "Spain", "France", "Germany","Iran", "Italy", "Korea, South", "United Kingdom", "US")) %>%
-  mutate(Country = as.character(Country)) %>%
-  filter(!is.na(Population))
-
-d1 <- split(d0, d0$Country)
-d2 <- lapply(d1, function(table) {
-  table$Day <- 1:nrow(table)
-  table
-})
-
-labels <- lapply(d2, tail, 1) %>% bind_rows()
-
-country_data <- bind_rows(d2)
-
-#recovery_data <- country_data %>%
-#  gather(key = 'Measure', value = 'Count', 'Cases', 'recovered.est', 'recovered')
-
-g <- ggplot(country_data) +
-  aes(x=Day) +
-  geom_line(show.legend = F) +
-  coord_cartesian(xlim=c(0, max(labels$Day) + 15)) +
-  ggtitle(paste0("National Trends as of ",format(end_date, "%B%e, %Y")), subtitle="Plotted individually from the first day of 5 recorded deaths") +
-  xlab("Days Since First 24 Deaths") +
-  facet_wrap('Country')
-
-g + aes(y=Cases.Growth3) +
-  ylab("Daily Increase in Cases") +
-  scale_y_continuous(labels=percent) 
-
-g + aes(y=Cases) + 
-  ylab("Confirmed Cases")  +
-  scale_y_continuous(labels=comma) 
-
-g + aes(y=Deaths.Per100K) + 
-  ylab("Deaths Per 100K Population") +
-  scale_y_continuous(labels=comma) 
-
-```
-
 
 ### State by State Confirmed Cases
 
@@ -408,9 +299,8 @@ Total deaths to date in all three counties: `r LP.Cases.Per100K$Deaths`.
 
 Total cases per 100K people: `r round(LP.Cases.Per100K$Cases.Per100K, 1)`
 
-# Scatter Plots
+## Population Density vs. Infection Rate
 
-Population Density vs. Infection Rate
 ```{r fig.width=5}
 current_data <- filter(cvdata.us, Date == last_date & !is.na(Population.Density)) %>%
   mutate(Deaths.Per100K = Deaths * 100000 / Population)
@@ -501,10 +391,10 @@ g <- split(history.1, history.1$Region) %>%
       geom_point(show.legend = F, size=0.6) +
       scale_y_continuous(labels=percent) +
       geom_label(data=df.current, aes(label=State.Code), show.legend=F) +
-      coord_cartesian(xlim=c(0, 3000)) 
+      coord_cartesian(xlim=c(0, 4000)) 
   }) 
 
-
+g
 ```
 
 Arizona Counties

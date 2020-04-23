@@ -79,7 +79,7 @@ calculate_differentials <- function(infection_data, target_variables) {
     growth_rows <- (infection_data[,target_var.diff3] != 0 & infection_data[,target_var] != 0)[,1]
     infection_data[growth_rows, growth_var]     <- round(infection_data[growth_rows, target_var.diff3] / infection_data[growth_rows, target_var], 4)
     infection_data[growth_rows, rate_var]       <- infection_data[growth_rows, target_var.diff3] * 100000 / infection_data$Population[growth_rows]
-    infection_data[, per_capita_var] <- infection_data[, target_var] * 100000 / infection_data$Population
+    infection_data[, per_capita_var] <- round(signif(infection_data[, target_var] * 100000 / infection_data$Population, 3))
     infection_data[!growth_rows, c(growth_var, rate_var) ] <- list(0,0)
   }
   return(infection_data)
@@ -133,19 +133,4 @@ get_geographic_data <- function() {
   
 }
 
-counties <- unique(az$County)
-dates <- seq(mdy('03-25-2020'), by=1, length.out = length(counties))
-names(dates) <- counties
-
-labels <- filter(az, Date == dates[County])
-
-ggplot(filter(az, Cases.Per100K > 0.1)) + 
-  aes(x = Date, y = Cases.Per100K, color=County, linetype=County) + 
-  geom_line(show.legend=F) + 
-  coord_cartesian(xlim=c(mdy('03-24-2020'), date())) + 
-#  scale_y_log10() + 
-  geom_text(data=labels, aes(x=Date, y=Cases.Per100K, label=County), show.legend = F, nudge_y = 8)
-  
-  
-  
   
