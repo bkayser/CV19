@@ -104,8 +104,12 @@ I believe these dates represent when things will be at their worst.  There will 
 ```{r fig.width=10, fig.height=7}
 
 # Step 0: Filter the left and right edge of the timeseries
-countries.filtered <- filter(cvdata.i18n, Cases > 100 & Country %in% c("China, Hubei", "Spain", "France", "Germany","Iran", "Italy", "Korea, South", "United Kingdom", "US")) %>%
-  mutate(Country = fct_relevel(Country, "China, Hubei", "Korea, South")) %>%
+countries.filtered <- 
+  filter(cvdata.i18n, Cases > 100 & Country %in% c("China, Hubei", "Spain", "France", "Germany","Iran", 
+                                                   "Italy", "Korea, South", "United Kingdom", "US", 
+                                                   "Russia", "India", "South Africa", "Iceland", "Belgium", "Ireland", "San Marino", "Sweden",
+                                                   "Norway", "Denmark", "United Arab Emirates")) %>%
+  mutate(Country = fct_relevel(Country, "China, Hubei", "Korea, South", 'Spain', 'Italy', 'US')) %>%
   filter(!is.na(Population))
 
 peak_growth <- 
@@ -114,16 +118,17 @@ peak_growth <-
             by=c('Country', 'Cases.Growth3')) %>%
   select(Country, Date)
 
+start_dates <- peak_growth$Date
+names(start_dates) <- as.character(peak_growth$Country)
+
 target_growth <- 
-  filter(countries.filtered, Cases > 1000 & Cases.Growth3 < 0.014) %>%
+  filter(countries.filtered, Cases > 500 & Cases.Growth3 < 0.014 & Date > start_dates[Country]) %>%
   group_by(Country) %>%
   summarize(Date = min(Date))
 
-start_dates <- peak_growth$Date
-names(start_dates) <- peak_growth$Country
 
 end_dates <- target_growth$Date
-names(end_dates) <- target_growth$Country
+names(end_dates) <- as.character(target_growth$Country)
 
 # Split the table of countries into separate tables per country
 countries.list <- split(countries.filtered, countries.filtered$Country)
@@ -131,9 +136,9 @@ countries.list <- split(countries.filtered, countries.filtered$Country)
 # Filter the dates of each country to include only dates after the peak growth in cases occur.
 countries.pred_window <- lapply(countries.list, function(table) {
   country <- table$Country[1]
-  t <- table[table$Date >= start_dates[country] & 
-               (is.na(end_dates[country]) | table$Date < end_dates[country]),]
+  t <- table[table$Date >= start_dates[country], ] # & (is.na(end_dates[country])), ]# | table$Date < end_dates[country]),]
   # Index this remaining data by Day, starting with the value Day = 1.
+  if (nrow(t) == 0) { print(country)}
   t$Day <- 1:nrow(t)
   t
 })
@@ -169,19 +174,50 @@ country_data <- lapply(countries.list, function(table) {
   t$Day <- 1:nrow(t)
   t
 }) %>% bind_rows()
+display_countries <-  c("China, Hubei", "Spain", "France", "Germany","Iran", "Italy", "Korea, South", "United Kingdom", "US")
+prediction_data <- list(country_data=country_data, 
+                      predictions.country=predictions.country, 
+                      predictions.country.target_day=predictions.country.target_day)
 
-ggplot(country_data) +
+filtered_data <- lapply(prediction_data, function(data) { filter(data, Country %in% display_countries) })
+
+ggplot(filtered_data[['country_data']]) +
   aes(x=Day, y=Cases.Growth3, color=Country) +
   geom_line(show.legend = F) +
-  geom_line(data=predictions.country, color='black', size=0.5, linetype=3) +
-  geom_vline(data=predictions.country.target_day, aes(xintercept = Day), color='darkgreen', size=0.5, alpha=0.5) +
-  geom_label(data=predictions.country.target_day, aes(label = Label, x = Day), y = 0.25, color='darkgreen', size=3) +
+  geom_line(data=filtered_data[['predictions.country']], color='black', size=0.5, linetype=3) +
+  geom_vline(data=filtered_data[['predictions.country.target_day']], aes(xintercept = Day), color='darkgreen', size=0.5, alpha=0.5) +
+  geom_label(data=filtered_data[['predictions.country.target_day']], aes(label = Label, x = Day), y = 0.25, color='darkgreen', size=3) +
   scale_y_continuous(labels=percent) +
   facet_wrap('Country') +
   theme(strip.text.x = element_text(face='bold', size=9)) +
-  ggtitle(paste0("National Trends as of ",format(end_date, "%B %e, %Y")), subtitle="Plotted individually from the first day of 5 recorded deaths") +
-  xlab("Days Since First 24 Deaths") +
+  ggtitle(paste0("National Trends as of ",format(end_date, "%B %e, %Y")), subtitle="Plotted individually from the first day with more than 500 cases") +
+  xlab("Days Since First 500 Cases") +
   ylab("Daily Increase in Cases")
+  
+rm(filtered_data, country_data, countries.filtered, peak_growth, target_growth, start_dates, end_dates, countries.list, countries.pred_window,
+   extrapolate.lm, predictions.country.list, predictions.country, predictions.country.target_day, display_countries)
+```
+
+
+```{r, fig.width=4, fig.height=3}
+
+filtered_data <- lapply(prediction_data, function(data) { filter(data, Country %in% c("Germany", "India", "Russia", "US", "United Arab Emerates")) })
+
+ggplot(filtered_data[['country_data']]) +
+  aes(x=Day, y=Cases.Growth3, color=Country) +
+  geom_line(show.legend = T) +
+#  geom_line(data=filtered_data[['predictions.country']], size=0.5, linetype=3, show.legend=F) +
+  scale_y_continuous(labels=percent) +
+  theme(strip.text.x = element_text(face='bold', size=9)) +
+  ggtitle(paste0("National Trends as of ",format(end_date, "%B %e, %Y")), subtitle="Plotted individually from the first day with more than 500 cases") +
+  xlab("Days Since First 500 Cases") +
+  ylab("Daily Increase in Cases") +
+  geom_label(aes(label=percent(Cases.Growth3)), data=~tail(arrange(.x, Date), 4), nudge_y=0.01, show.legend = F) +
+  coord_cartesian(xlim=c(0, 50)) +
+  theme(legend.position = c(0.8, 0.8),
+        panel.grid=element_blank(),
+        legend.title= element_blank(),
+        legend.key.width = unit(40, 'pt'))
   
 ```
 
@@ -220,13 +256,6 @@ peak_growth <-
 
 start_dates <- peak_growth$Date
 names(start_dates) <- peak_growth$State
-
-# target_growth <- 
-#   filter(states.filtered, Cases > 1000 & Cases.Growth3 < 0.014) %>%
-#   group_by(State) %>%
-#   summarize(Date = min(Date))
-# end_dates <- target_growth$Date
-# names(end_dates) <- target_growth$State
 
 # Split the table of countries into separate tables per country
 states.list <- split(states.filtered, states.filtered$State)

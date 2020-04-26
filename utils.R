@@ -133,4 +133,3 @@ get_geographic_data <- function() {
   
 }
 
-  

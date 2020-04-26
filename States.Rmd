@@ -164,7 +164,7 @@ g <- cvdata.us.by_state %>%
   ggplot() +
   aes(Date, Cases.Diff3, color=State, fill=State) +
   geom_line() + 
-  geom_smooth(alpha=0.1, method='lm', formula= y ~ poly(x,5), fullrange=T, span=0.2, size=0.5, linetype=3) +
+  geom_smooth(alpha=0.1, method='lm', formula= y ~ poly(x,4), fullrange=T, span=0.2, size=0.5, linetype=3) +
   ggtitle('Cases Day to Day Change in Top 5 States',
           subtitle = str_c("Reported data through ", format(max(cvdata.us$Date), "%B %d, %Y"))) +
   ylab("Daily Increase") +
@@ -174,6 +174,7 @@ g <- cvdata.us.by_state %>%
 g
 
 ```
+
 
 ```{r}
 cvdata.us.by_state %>%
@@ -193,21 +194,59 @@ cvdata.us.by_state %>%
 
 ```
 
-### State by State Confirmed Cases
+## Oregon
+
+
+```{r echo=F, fig.height=4, fig.width=5}
+cvdata.or <- filter(cvdata.us.by_state, State.Code == 'OR')
+
+g <- ggplot(cvdata.or) +
+  aes(Date, Cases.Diff3) +
+  geom_line(color='blue') + 
+  geom_text(aes(label=Cases.Diff3), color='black', nudge_y=3) +
+  geom_smooth(alpha=0.1, method='lm', color='blue', fill='blue', formula= y ~ poly(x,4), fullrange=T, span=0.2, size=0.5, linetype=3) +
+  ggtitle('Oregon Change in Confirmed Cases, Three Day Average',
+          subtitle = str_c("Reported data through ", format(max(cvdata.us$Date), "%B %d, %Y"))) +
+  ylab("Daily Increase") +
+  geom_text(data=~ tail(.x, 1), aes(y=Deaths, label=Deaths), color='red', size=8, nudge_y=4, show.legend = T) +
+  xlab(NULL)  +
+  geom_line(aes(y=Deaths), color='red') +
+  coord_cartesian(xlim=c(ymd('2020-03-15'), end_date), ylim=c(0, 100)) +
+  scale_x_date(breaks=breaks, date_labels = '%m/%d', date_minor_breaks='1 day')
+g
+
+```
+
+
+```{r echo=F, fig.height=4, fig.width=5}
+
+g <- ggplot(cvdata.or) +
+  aes(Date, Deaths.Diff3) +
+  geom_line(color='blue') + 
+  geom_smooth(alpha=0.1, method='lm', color='blue', fill='blue', formula= y ~ poly(x,4), fullrange=T, span=0.2, size=0.5, linetype=3) +
+  ggtitle('Oregon Change Deaths, Three Day Average',
+          subtitle = str_c("Reported data through ", format(max(cvdata.us$Date), "%B %d, %Y"))) +
+  ylab("Daily Increase") +
+  xlab(NULL)  +
+  coord_cartesian(xlim=c(ymd('2020-03-15'), end_date), ylim=c(0, 5)) +
+  scale_x_date(breaks=breaks, date_labels = '%m/%d', date_minor_breaks='1 day')
+g
+
+```
+
+## State by State Confirmed Cases
 
 ```{r, fig.width=6, fig.height=6}
 today <- filter(cvdata.us) %>%
-  filter(Date == end_date & !is.na(Region) & Population > 500) %>%
-  mutate(Cases.Rate = 1000000 * Cases / Population) 
+  filter(Date == end_date & !is.na(Region) & Population > 500)
 
-averages.by_state <- tapply(today$Cases.Rate, today$State.Code, mean) %>% sort() %>% rev()
-today <- mutate(today, State.Code = fct_relevel(State.Code, names(averages.by_state)))
-
+averages.by_state <- tapply(today$Cases.Per100K, today$State.Code, median) %>% sort() 
 ggplot(today) +
-  aes(x = State.Code, y = Cases.Rate, fill = Region) +
+  aes(x = fct_relevel(State.Code, names(averages.by_state)), y = Cases.Per100K, fill = Region) +
   geom_boxplot() +
-  coord_flip(ylim=c(0,3000)) +
-  ggtitle("")
+  coord_flip(ylim=c(0,1200)) +
+  ggtitle("") +
+  ggtitle('Cases Per Capita for Counties, State by State')
 ```
 
 ### Infections Per Capita
@@ -391,13 +430,13 @@ g <- split(history.1, history.1$Region) %>%
       geom_point(show.legend = F, size=0.6) +
       scale_y_continuous(labels=percent) +
       geom_label(data=df.current, aes(label=State.Code), show.legend=F) +
-      coord_cartesian(xlim=c(0, 4000)) 
+      coord_cartesian(xlim=c(0, 4100)) 
   }) 
 
 g
 ```
 
-Arizona Counties
+## Arizona Counties
 
 ```{r}
 filter(cvdata.us, State == 'Arizona' & Cases.Per100K > 0.1) %>%
@@ -410,3 +449,22 @@ filter(cvdata.us, State == 'Arizona' & Cases.Per100K > 0.1) %>%
 
 ```
 
+# Cases and Recoveries
+
+```{r, fig.width=4}
+
+filter(cvdata.us.by_state, State %in% head(arrange(testdata, desc(Cases))$State, 6)) %>%
+  ggplot() +
+  aes(x=Date, color=State) +
+  geom_line(aes(y=Cases)) +
+  geom_line(aes(y=Est.Recovered), linetype=2) +
+  geom_line(aes(y=Recovered), linetype=4) +
+  theme(legend.title = element_blank(),
+        legend.position = c(0.2, 0.8)) +
+  coord_cartesian(xlim=c(mdy('03-15-2020'), today())) +
+  scale_y_continuous(label=comma) +
+  ylab('Cases') + xlab(NULL) +
+  theme_light() +
+  facet_wrap('State', 2)
+         
+```
