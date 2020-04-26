@@ -104,7 +104,7 @@ I believe these dates represent when things will be at their worst.  There will 
 ```{r fig.width=10, fig.height=7}
 
 # Step 0: Filter the left and right edge of the timeseries
-countries.filtered <- 
+major_countries <- 
   filter(cvdata.i18n, Cases > 100 & Country %in% c("China, Hubei", "Spain", "France", "Germany","Iran", 
                                                    "Italy", "Korea, South", "United Kingdom", "US", 
                                                    "Russia", "India", "South Africa", "Iceland", "Belgium", "Ireland", "San Marino", "Sweden",
@@ -113,8 +113,8 @@ countries.filtered <-
   filter(!is.na(Population))
 
 peak_growth <- 
-  semi_join(countries.filtered, 
-            group_by(countries.filtered, Country) %>% summarize(Cases.Growth3 = max(Cases.Growth3)),
+  semi_join(major_countries, 
+            group_by(major_countries, Country) %>% summarize(Cases.Growth3 = max(Cases.Growth3)),
             by=c('Country', 'Cases.Growth3')) %>%
   select(Country, Date)
 
@@ -122,7 +122,7 @@ start_dates <- peak_growth$Date
 names(start_dates) <- as.character(peak_growth$Country)
 
 target_growth <- 
-  filter(countries.filtered, Cases > 500 & Cases.Growth3 < 0.014 & Date > start_dates[Country]) %>%
+  filter(major_countries, Cases > 500 & Cases.Growth3 < 0.014 & Date > start_dates[Country]) %>%
   group_by(Country) %>%
   summarize(Date = min(Date))
 
@@ -131,7 +131,7 @@ end_dates <- target_growth$Date
 names(end_dates) <- as.character(target_growth$Country)
 
 # Split the table of countries into separate tables per country
-countries.list <- split(countries.filtered, countries.filtered$Country)
+countries.list <- split(major_countries, major_countries$Country)
 
 # Filter the dates of each country to include only dates after the peak growth in cases occur.
 countries.pred_window <- lapply(countries.list, function(table) {
@@ -194,8 +194,8 @@ ggplot(filtered_data[['country_data']]) +
   xlab("Days Since First 500 Cases") +
   ylab("Daily Increase in Cases")
   
-rm(filtered_data, country_data, countries.filtered, peak_growth, target_growth, start_dates, end_dates, countries.list, countries.pred_window,
-   extrapolate.lm, predictions.country.list, predictions.country, predictions.country.target_day, display_countries)
+rm(filtered_data, country_data, major_countries, peak_growth, target_growth, start_dates, end_dates, countries.list, countries.pred_window,
+   extrapolate.lm, predictions.country, predictions.country.target_day, display_countries)
 ```
 
 
@@ -206,7 +206,6 @@ filtered_data <- lapply(prediction_data, function(data) { filter(data, Country %
 ggplot(filtered_data[['country_data']]) +
   aes(x=Day, y=Cases.Growth3, color=Country) +
   geom_line(show.legend = T) +
-#  geom_line(data=filtered_data[['predictions.country']], size=0.5, linetype=3, show.legend=F) +
   scale_y_continuous(labels=percent) +
   theme(strip.text.x = element_text(face='bold', size=9)) +
   ggtitle(paste0("National Trends as of ",format(end_date, "%B %e, %Y")), subtitle="Plotted individually from the first day with more than 500 cases") +
@@ -218,21 +217,20 @@ ggplot(filtered_data[['country_data']]) +
         panel.grid=element_blank(),
         legend.title= element_blank(),
         legend.key.width = unit(40, 'pt'))
-  
+rm(filtered_data, prediction_data)  
 ```
 
 What's key to note is that the prediction for China and South Korea is pretty much right on.  The prediction line for other countries looks like a pretty good fit, and is particularly striking in France, Spain and the US.  
 
 ```{r}
 
-data <- lapply(predictions.country.list, tail, 1) %>% 
+lapply(predictions.country.list, tail, 1) %>% 
   bind_rows() %>%
   mutate(Days.From.Now=Date - today()) %>%
   select(Country, Date, Days.From.Now) %>%
-  mutate(Date = format(Date, '%B %e'))
-#write.csv(data, 'data/country-predictions-0411.csv')
-kable(data)
-
+  mutate(Date = format(Date, '%B %e')) %>%
+kable()
+rm(predictions.country.list)
 ```
 
 # State by State Predictions
@@ -240,7 +238,6 @@ kable(data)
 Then I turned to the US to see if I could go state by state.
 
 ```{r fig.height=3.5, fig.width=5}
-
 state_selection <-  c("New York", "Oregon", "California", "New Jersey", "Arizona", "Indiana",
                       "Rhode Island", "South Dakota", "Massachusetts")
 training_window <- 20
@@ -305,7 +302,7 @@ state_data <- lapply(states.list, function(table) {
   t
 }) %>% bind_rows() %>%
   filter(State %in% state_selection)
-end_date <- max(state_data$Date)
+
 ggplot(state_data) +
   aes(x=Day, y=Cases.Growth3, color=State) +
   geom_line(show.legend = F) +
@@ -320,6 +317,9 @@ ggplot(state_data) +
   ylab("Rate of Growth of New Confirmed Cases") +
   coord_cartesian(xlim=c(0, 40))
   
+rm(state_selection, training_window, states.filtered, peak_growth, start_dates, states.list, 
+   states.pred_window, extrapolate.lm, state_data, predictions.state.target_day, predictions.state)
+
 ```
 
 In South Dakota, things are so early that the rate of increase is unstable.  
@@ -337,14 +337,13 @@ filter(cvdata.us.by_state, State == 'South Dakota') %>%
 Finally, I ran a calculation on each state and put the results in a table.
 
 ```{r}
-
-data <- lapply(predictions.state.list, tail, 1) %>% 
+lapply(predictions.state.list, tail, 1) %>% 
   bind_rows() %>%
   mutate(Days.From.Now=Date - today()) %>%
   select(State, Date, Days.From.Now) %>%
-  mutate(Date = format(Date, '%B %e')) 
-# write.csv(data, 'data/state-predictions-0411.csv')
-kable(data)
+  mutate(Date = format(Date, '%B %e')) %>%
+  kable()
+rm(predictions.state.list)
 ```
 
 # What's Next?

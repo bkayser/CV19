@@ -21,9 +21,8 @@ library(scales)
 library(caTools)
 source('utils.R')
 knitr::opts_chunk$set(echo=F)
-theme_set(theme_fivethirtyeight())
+# old_theme <- theme_set(ggthemes::theme_fivethirtyeight())
 
-library(ggthemes)
 
 ```
 
@@ -56,49 +55,21 @@ Let's first set up some parameters for the graph's X axis.
 ```{r}
 start_date <- mdy('02/26/2020')
 end_date <- max(cvdata.us$Date)
-breaks <- seq(end_date,
+date.breaks <- seq(end_date,
               start_date,
               by="-1 week") %>% rev()
-if (breaks[1] != start_date) {
-  breaks <- c(breaks[1]-days(7), breaks)
-  start_date <- breaks[1]
+if (date.breaks[1] != start_date) {
+  date.breaks <- c(date.breaks[1]-days(7), date.breaks)
+  start_date <- date.breaks[1]
 }
-```
-
-### Reporting Anomalies
-
-Consider the growth in deaths and cases, county by county, on each day of the week when there are at least 100 active confirmed cases.
-
-```{r}
-cvdata.daily <- cvdata.us %>%
-  filter(Cases > 100) %>%
-  mutate(day.of.week = factor(strftime(Date, '%A'), levels = c('Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday')),
-         Cases.Growth = Cases.Diff / Cases,
-         Deaths.Growth = ifelse(Deaths == 0, 0, Deaths.Diff / Deaths))
-```
-
-What is the typical change in Confirmed Cases and Deaths on any day of the week?
-
-```{r}
-group_by(cvdata.daily, day.of.week) %>%
-  summarize(Cases.Growth.Mean = percent(mean(Cases.Growth)),
-            Deaths.Growth.Mean = percent(mean(Deaths.Growth, na.rm=T)))
-
-ggplot(cvdata.daily) +
-  aes(x=day.of.week, y = Cases.Growth) +
-  geom_boxplot() +
-  xlab('Day of Week') +
-  ylab('Growth in Cases') +
-  scale_y_continuous(labels=percent)
 ```
 
 
 ### Top Countries infected
 
 ```{r top_countries, fig.width=5}
-max_date <- max(cvdata.i18n$Date)
 countries <- 
-  filter(cvdata.i18n, Date == max_date) %>%
+  filter(cvdata.i18n, Date == end_date) %>%
   arrange(desc(Cases)) %>% 
   head(10)
 
@@ -109,19 +80,18 @@ ggplot(countries) +
   geom_col(show.legend=F) +
   scale_y_continuous(labels=comma) +
   xlab(NULL)
+rm(countries)
 ```
 
 
 ```{r fig.width=5, fig.height=4}
-
-top_countries <- cvdata.i18n %>%
+cvdata.i18n %>%
   arrange(desc(Date)) %>%
   group_by(Key) %>%
   summarize(Cases.Per100K = first(Cases.Per100K)) %>%
   arrange(desc(Cases.Per100K)) %>%
-  head(50)
-
-ggplot(top_countries) +
+  head(50) %>%
+  ggplot() +
   aes(x=reorder(Key, Cases.Per100K), y=Cases.Per100K, fill=Cases.Per100K) +
   geom_col() +
   scale_fill_gradient(low='#00FFAA', high='red', trans='log10') +
@@ -134,10 +104,52 @@ ggplot(top_countries) +
         panel.border = element_blank(),
         axis.text.x = element_blank(),
         legend.position=c(0.5,0.5))
-  #scale_y_log10()
+```
+
+
+```{r fig.width=5, fig.height=4}
+
+cvdata.i18n %>%
+  arrange(desc(Date), desc(Cases)) %>%
+  head(50) %>%
+  ggplot() +
+  aes(x=reorder(Key, Cases), y=Cases, fill=Cases) +
+  geom_col() +
+  scale_fill_gradient(low='#00FFAA', high='red', trans='log10') +
+  geom_text(aes(label=round(Cases)), size=4, nudge_y=30) +
+  coord_flip() +  
+  xlab(NULL) +
+  ylab('Confirmed Cases') +
+  ggtitle('Countries Ranked by Confirmed Cases') +
+  theme(line = element_blank(), 
+        panel.border = element_blank(),
+        axis.text.x = element_blank(),
+        legend.position=c(0.5,0.5))
 
 ```
 
+
+
+```{r fig.width=5, fig.height=4}
+
+cvdata.i18n %>%
+  filter(Date == end_date, Cases.Growth3 > 0) %>%
+  arrange(desc(Cases.Growth3)) %>%
+  head(50) %>%
+  ggplot() +
+  aes(x=reorder(Key, Cases.Growth3), y=Cases.Growth3, fill=Cases.Growth3) +
+  geom_col(show.legend=F) +
+  scale_fill_gradient(low='#00FFAA', high='red', trans='log10') +
+  geom_text(aes(label=percent(round(Cases.Growth3, 3))), size=4, nudge_y=0.008) +
+  coord_flip() +  
+  xlab(NULL) +
+  ylab('Growth in Confirmed Cases') +
+  ggtitle('Countries Ranked by Rate of Growth') +
+  theme(line = element_blank(), 
+        panel.border = element_blank(),
+        axis.text.x = element_blank())
+  #scale_y_log10()
+```
 ### International Cases
 
 ```{r fig.width=6}
@@ -153,12 +165,7 @@ d2 <- lapply(d1, function(table) {
 
 labels <- lapply(d2, tail, 1) %>% bind_rows()
 
-country_data <- bind_rows(d2)
-
-#recovery_data <- country_data %>%
-#  gather(key = 'Measure', value = 'Count', 'Cases', 'recovered.est', 'recovered')
-
-g <- ggplot(country_data) +
+g <- ggplot(bind_rows(d2)) +
   aes(x=Day) +
   geom_line(show.legend = F) +
   coord_cartesian(xlim=c(0, max(labels$Day) + 15)) +
@@ -177,6 +184,6 @@ g + aes(y=Cases) +
 g + aes(y=Deaths.Per100K) + 
   ylab("Deaths Per 100K Population") +
   scale_y_continuous(labels=comma) 
-
+rm(d0,d1,d2, labels)
 ```
 

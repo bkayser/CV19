@@ -22,7 +22,7 @@ library(caTools)
 library(ggthemes)
 source('utils.R')
 knitr::opts_chunk$set(echo=F)
-theme_set(theme_fivethirtyeight())
+#old_theme <- theme_set(theme_fivethirtyeight())
 library(ggthemes)
 
 ```
@@ -48,12 +48,12 @@ cvdata.us.by_state <- readRDS('data/cvdata.us.by_state.RDS')
 
 start_date <- mdy('02/26/2020')
 end_date <- max(cvdata.us$Date)
-breaks <- seq(end_date,
+date.breaks <- seq(end_date,
               start_date,
               by="-1 week") %>% rev()
-if (breaks[1] != start_date) {
-  breaks <- c(breaks[1]-days(7), breaks)
-  start_date <- breaks[1]
+if (date.breaks[1] != start_date) {
+  date.breaks <- c(date.breaks[1]-days(7), date.breaks)
+  start_date <- date.breaks[1]
 }
 ```
 
@@ -97,7 +97,7 @@ g <- cvdata.us.by_state %>%
   geom_line() + 
   xlab(NULL) +
   coord_cartesian(xlim=c(start_date, end_date)) +
-  scale_x_date(breaks=breaks, date_labels = '%m/%d', date_minor_breaks='1 day')
+  scale_x_date(breaks=date.breaks, date_labels = '%m/%d', date_minor_breaks='1 day')
 
 g + scale_y_continuous(labels=comma) 
 g + scale_y_log10(labels=comma) + labs(subtitle="Log Scale")
@@ -107,7 +107,6 @@ g + scale_y_log10(labels=comma) + labs(subtitle="Log Scale")
 ## Deaths in Top 10 States
 
 ```{r echo=F}
-cvdata.us.current <- filter(cvdata.us.by_state, Date == end_date)
 Deaths.top.10 <- arrange(cvdata.us.current, desc(Deaths)) %>% head(10) %>% pull(State) %>% droplevels() 
 
 g <- cvdata.us.by_state %>%
@@ -121,7 +120,7 @@ g <- cvdata.us.by_state %>%
   geom_line() + 
   xlab(NULL) +
   coord_cartesian(xlim=c(start_date, end_date)) +
-  scale_x_date(breaks=breaks, date_labels = '%m/%d', date_minor_breaks='1 day')
+  scale_x_date(breaks=date.breaks, date_labels = '%m/%d', date_minor_breaks='1 day')
 
 g + scale_y_continuous(labels=comma) 
 g + scale_y_log10(labels=comma) + labs(subtitle="Log Scale")
@@ -170,7 +169,7 @@ g <- cvdata.us.by_state %>%
   ylab("Daily Increase") +
   xlab(NULL)  +
   coord_cartesian(xlim=c(ymd('2020-03-15'), end_date)) +
-  scale_x_date(breaks=breaks, date_labels = '%m/%d', date_minor_breaks='1 day')
+  scale_x_date(breaks=date.breaks, date_labels = '%m/%d', date_minor_breaks='1 day')
 g
 
 ```
@@ -190,7 +189,7 @@ cvdata.us.by_state %>%
   ylab("Daily Increase, per 1M people") +
   xlab(NULL)  +
   coord_cartesian(xlim=c(start_date, end_date)) +
-  scale_x_date(breaks=breaks, date_labels = '%m/%d', date_minor_breaks='1 day')
+  scale_x_date(breaks=date.breaks, date_labels = '%m/%d', date_minor_breaks='1 day')
 
 ```
 
@@ -212,7 +211,7 @@ g <- ggplot(cvdata.or) +
   xlab(NULL)  +
   geom_line(aes(y=Deaths), color='red') +
   coord_cartesian(xlim=c(ymd('2020-03-15'), end_date), ylim=c(0, 100)) +
-  scale_x_date(breaks=breaks, date_labels = '%m/%d', date_minor_breaks='1 day')
+  scale_x_date(breaks=date.breaks, date_labels = '%m/%d', date_minor_breaks='1 day')
 g
 
 ```
@@ -229,7 +228,7 @@ g <- ggplot(cvdata.or) +
   ylab("Daily Increase") +
   xlab(NULL)  +
   coord_cartesian(xlim=c(ymd('2020-03-15'), end_date), ylim=c(0, 5)) +
-  scale_x_date(breaks=breaks, date_labels = '%m/%d', date_minor_breaks='1 day')
+  scale_x_date(breaks=date.breaks, date_labels = '%m/%d', date_minor_breaks='1 day')
 g
 
 ```
@@ -247,6 +246,8 @@ ggplot(today) +
   coord_flip(ylim=c(0,1200)) +
   ggtitle("") +
   ggtitle('Cases Per Capita for Counties, State by State')
+
+rm(today, averages.by_state)
 ```
 
 ### Infections Per Capita
@@ -254,10 +255,8 @@ ggplot(today) +
 Let's chart the current confirmed cases and deaths as a percentage of population.
 
 ```{r}
-last_date <- max(cvdata.us.by_state$Date)
-
 cvdata.us.by_state %>%
-  filter(Date == last_date) %>%
+  filter(Date == end_date) %>%
   mutate(Infections.Per.100_000 = round(100000 * Cases / Population),
          Deaths.Per.100_000 = round(100000 * Deaths / Population, 1)) %>%
   select(State, Infections.Per.100_000, Deaths.Per.100_000) %>%
@@ -269,9 +268,9 @@ cvdata.us.by_state %>%
 ### Infection Rate by Region
 
 ```{r fig.width=5}
-data <- cvdata.us.by_state %>% filter(Date == last_date)
-
-ggplot(data) +
+cvdata.us.by_state %>% 
+  filter(Date == last_date) %>%
+  ggplot() +
   aes(x=Region, y=Deaths.Per100K, fill=Region) +
   geom_boxplot() +
 #  scale_y_log10(labels=comma) +
@@ -302,7 +301,7 @@ g <- ggplot(our_counties) +
           subtitle = str_c("Reported data through ", format(max(cvdata.us$Date), "%B %d, %Y"))) +
   geom_line(aes(linetype=State)) + 
   geom_label(data=labels, aes(label=Key), hjust='right', show.legend=F, nudge_x = -1) +
-  scale_x_date(breaks=breaks, date_labels = '%m/%d', date_minor_breaks='1 day')
+  scale_x_date(breaks=date.breaks, date_labels = '%m/%d', date_minor_breaks='1 day')
 
 g +
   aes(y = Cases.Per100K) +
@@ -311,6 +310,8 @@ g +
 g +
   aes(y = Cases) +
   ylab("Confirmed Cases")
+
+rm(labels)
 ```
 
 
@@ -332,6 +333,7 @@ LP.Cases.Per100K <- filter(our_counties, Date == last_date) %>%
 
 ranking <- round(sum(all_counties$Cases.Per100K <= LP.Cases.Per100K$Cases.Per100K[1]) / nrow(all_counties) * 100, 1)
 median_rate <- median(all_counties$Cases.Per100K)
+rm(all_counties)
 ```
 
 Total deaths to date in all three counties: `r LP.Cases.Per100K$Deaths`.
@@ -341,15 +343,10 @@ Total cases per 100K people: `r round(LP.Cases.Per100K$Cases.Per100K, 1)`
 ## Population Density vs. Infection Rate
 
 ```{r fig.width=5}
-current_data <- filter(cvdata.us, Date == last_date & !is.na(Population.Density)) %>%
-  mutate(Deaths.Per100K = Deaths * 100000 / Population)
-# ggplot(current_data) +
-#   aes(x=Cases.Diff3.Per100K) +
-#   geom_histogram(bins=400) +
-#   coord_cartesian(xlim=c(-10, 50))
-#       subtitle='Data from 2019 Novel Coronavirus Visual Dashboard operated by the Johns Hopkins University Center for Systems Science and Engineering',
-
-ggplot(filter(current_data, Deaths.Per100K > 0)) +
+filter(cvdata.us, Date == last_date & !is.na(Population.Density)) %>%
+  mutate(Deaths.Per100K = Deaths * 100000 / Population) %>%
+  filter(Deaths.Per100K > 0) %>%
+ggplot() +
   aes(x=Population.Density, y=Cases.Per100K, show.legend=F) +
   geom_point(size=0.2) +
   geom_smooth(method='lm', formula = y ~ x, color='red', size=0.5) +
@@ -434,6 +431,7 @@ g <- split(history.1, history.1$Region) %>%
   }) 
 
 g
+rm(history.1, df)
 ```
 
 ## Arizona Counties
@@ -455,7 +453,7 @@ filter(cvdata.us, State == 'Arizona' & Cases.Per100K > 0.1) %>%
 
 filter(cvdata.us.by_state, State %in% head(arrange(testdata, desc(Cases))$State, 6)) %>%
   ggplot() +
-  aes(x=Date, color=State) +
+  aes(x=Date) +
   geom_line(aes(y=Cases)) +
   geom_line(aes(y=Est.Recovered), linetype=2) +
   geom_line(aes(y=Recovered), linetype=4) +
@@ -467,4 +465,33 @@ filter(cvdata.us.by_state, State %in% head(arrange(testdata, desc(Cases))$State,
   theme_light() +
   facet_wrap('State', 2)
          
+```
+
+# Bubble Charts
+
+Plot the number of cases outside the number of recoveries.
+
+```{r fig.width=2, fig.height=2}
+
+filter(cvdata.us.by_state, Date == max(Date)) %>%
+  arrange(Region, State.Code) %>%
+  mutate(col = (row_number() %% 9), 
+         row = (row_number() %/% 9),
+         label_size = 0.06 * pmax(Cases, 15000),
+         State.Code = fct_inorder(State.Code)) %>%
+  ggplot() +
+  aes(x=col, y=row) +
+  geom_point(aes(size = Cases), color='red', alpha=0.5, show.legend=F) +
+  geom_point(aes(size = Est.Recovered), color='green', alpha=0.5, show.legend=F) +
+  xlab(NULL) + ylab(NULL) +
+  scale_y_continuous(label=comma) +
+  geom_text(aes(label=State.Code, size=label_size), nudge_x=-0.0, show.legend = F) +
+  coord_cartesian(xlim=c(-1,9),) +
+  scale_size(range=c(0, 30), limits=c(0,max(cvdata.us.by_state$Cases))) +
+  theme(panel.grid = element_blank(),
+        panel.grid.major = element_blank(),
+        axis.text = element_blank(),
+        legend.title = element_blank())
+
+
 ```
