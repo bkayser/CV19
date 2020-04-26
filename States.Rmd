@@ -269,7 +269,7 @@ cvdata.us.by_state %>%
 
 ```{r fig.width=5}
 cvdata.us.by_state %>% 
-  filter(Date == last_date) %>%
+  filter(Date == end_date) %>%
   ggplot() +
   aes(x=Region, y=Deaths.Per100K, fill=Region) +
   geom_boxplot() +
@@ -291,7 +291,7 @@ our_counties <- filter(cvdata.us,
                        (State == "California" & County %in% c('Contra Costa')) |
                      (State == "Arizona" & County %in% c('Maricopa')) |
                        (State == "Oregon" & County %in% c('Clackamas', 'Multnomah', 'Washington')))
-labels <- filter(our_counties, Date == last_date)
+labels <- filter(our_counties, Date == end_date)
 
 g <- ggplot(our_counties) +
   aes(x=Date, y=Cases.Per100K, color=County) +
@@ -323,7 +323,7 @@ all_counties <- cvdata.us %>%
   arrange(desc(Cases.Per100K)) %>%
   select(Key, Cases.Per100K) 
 
-LP.Cases.Per100K <- filter(our_counties, Date == last_date) %>% 
+LP.Cases.Per100K <- filter(our_counties, Date == end_date) %>% 
   group_by(State) %>%
   summarize(Deaths = sum(Deaths),
             Cases = sum(Cases),
@@ -343,7 +343,7 @@ Total cases per 100K people: `r round(LP.Cases.Per100K$Cases.Per100K, 1)`
 ## Population Density vs. Infection Rate
 
 ```{r fig.width=5}
-filter(cvdata.us, Date == last_date & !is.na(Population.Density)) %>%
+filter(cvdata.us, Date == end_date & !is.na(Population.Density)) %>%
   mutate(Deaths.Per100K = Deaths * 100000 / Population) %>%
   filter(Deaths.Per100K > 0) %>%
 ggplot() +
@@ -439,11 +439,20 @@ rm(history.1, df)
 ```{r}
 filter(cvdata.us, State == 'Arizona' & Cases.Per100K > 0.1) %>%
   ggplot() +
-  aes(x = Date, y = Cases.Per100K, color=County, linetype=County) + 
-  geom_line(show.legend=F) + 
-  coord_cartesian(xlim=c(mdy('03-24-2020'), date())) + 
-  #  scale_y_log10() + 
-  geom_text(data=labels, aes(x=Date, y=Cases.Per100K, label=County), show.legend = F, nudge_y = 8)
+  aes(
+    x = Date,
+    y = Cases.Per100K,
+    color = County,
+    linetype = County
+  ) +
+  geom_line(show.legend = F) +
+  coord_cartesian(xlim = c(mdy('03-24-2020'), date())) +
+  geom_text(
+    data = ~ filter(.x, Date == end_date),
+    aes(x = Date, y = Cases.Per100K, label = County),
+    show.legend = F,
+    nudge_y = 8
+  )
 
 ```
 
@@ -473,25 +482,70 @@ Plot the number of cases outside the number of recoveries.
 
 ```{r fig.width=2, fig.height=2}
 
-filter(cvdata.us.by_state, Date == max(Date)) %>%
-  arrange(Region, State.Code) %>%
-  mutate(col = (row_number() %% 9), 
-         row = (row_number() %/% 9),
-         label_size = 0.06 * pmax(Cases, 15000),
-         State.Code = fct_inorder(State.Code)) %>%
-  ggplot() +
+df <- filter(cvdata.us.by_state, Date == max(Date)) %>%
+  arrange(desc(Long)) %>%
+  mutate(col = ((row_number()-1) %% 9), 
+         row = ((row_number()-1) %/% 9),
+         label_size = 0.05* pmax(Cases/Population, 0.002),
+         State.Code = fct_inorder(State.Code))
+
+g <- ggplot(df) +
+  aes(x=col, y=5-row) +
+  geom_point(aes(size = Cases/Population), color='red', alpha=0.5, show.legend=F) +
+  xlab(NULL) + ylab(NULL) +
+  coord_cartesian(xlim=c(-0.5,8.5), ylim=c(-0.5,5.5)) +
+  scale_size(range=c(0, 20), limits=c(0,max(cvdata.us.by_state$Cases/cvdata.us.by_state$Population))) +
+  theme(panel.grid = element_blank(),
+        panel.grid.major = element_blank(),
+        axis.text = element_blank(),
+        legend.title = element_blank()) 
+
+g + 
+  geom_point(aes(size = Recovered/Population), color='green', alpha=0.5, show.legend=F) +
+  geom_text(aes(label=State.Code, size=label_size), nudge_x=-0.0, show.legend = F) +
+  ggtitle('Cases and Reported Recoveries per Capita ', 'Recoveries only reported from some states')
+
+g + 
+  geom_point(aes(size = Est.Recovered/Population), color='green', alpha=0.5, show.legend=F) +
+  geom_text(aes(label=State.Code, size=label_size), nudge_x=-0.0, show.legend = F) +
+  ggtitle('Cases and Estimated Recoveries per Capita', 'Recoveries estimated with 26 day median recovery time')
+
+rm(df)
+
+```
+
+
+```{r fig.width=2, fig.height=2}
+
+df <- filter(cvdata.us.by_state, Date == max(Date)) %>%
+  arrange(desc(Long)) %>%
+  mutate(col = pmax(Long, -124.30870),
+         row = pmax(pmin(Lat, 48.34522), 28.86617),
+         label_size = 0.04* pmax(Cases, 20000),
+         State.Code = fct_inorder(State.Code))
+
+
+g <- ggplot(df) +
   aes(x=col, y=row) +
   geom_point(aes(size = Cases), color='red', alpha=0.5, show.legend=F) +
-  geom_point(aes(size = Est.Recovered), color='green', alpha=0.5, show.legend=F) +
   xlab(NULL) + ylab(NULL) +
-  scale_y_continuous(label=comma) +
-  geom_text(aes(label=State.Code, size=label_size), nudge_x=-0.0, show.legend = F) +
-  coord_cartesian(xlim=c(-1,9),) +
+  #coord_cartesian(xlim=c(-0.5,8.5), ylim=c(-0.5,5.5)) +
   scale_size(range=c(0, 30), limits=c(0,max(cvdata.us.by_state$Cases))) +
   theme(panel.grid = element_blank(),
         panel.grid.major = element_blank(),
         axis.text = element_blank(),
-        legend.title = element_blank())
+        legend.title = element_blank()) 
 
+g + 
+  geom_point(aes(size = Recovered), color='green', alpha=0.5, show.legend=F) +
+  geom_text(aes(label=State.Code, size=label_size), nudge_x=-0.0, show.legend = F) +
+  ggtitle('Cases and Reported Recoveries per Capita ', 'Recoveries only reported from some states')
+
+g + 
+  geom_point(aes(size = Est.Recovered), color='green', alpha=0.5, show.legend=F) +
+  geom_text(aes(label=State.Code, size=label_size), nudge_x=-0.0, show.legend = F) +
+  ggtitle('Cases and Estimated Recoveries per Capita', 'Recoveries estimated with 26 day median recovery time')
+
+rm(df)
 
 ```

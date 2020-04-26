@@ -164,7 +164,9 @@ cvdata.us.by_state <- cvdata.us %>%
   group_by(State, State.Code, Date) %>%
   summarize(Cases = sum(Cases),
             Key = first(State),
-            Deaths = sum(Deaths))%>%
+            Deaths = sum(Deaths),
+            Lat = last(Lat),
+            Long = last(Long))%>%
   ungroup(State, Date) %>%
   left_join(states, by=c('State')) %>%
   mutate(State = as.factor(State)) %>%
@@ -212,7 +214,7 @@ I'll pick a gamma distribution with a mean of 4 weeks, a wide shape, and an offs
 
 ```{r}
 
-mean <- 20
+mean <- 28
 start <- 6
 scale  <- 6
 shape <- (mean - start) / scale
