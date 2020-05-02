@@ -89,11 +89,24 @@ population_data <- read.csv('https://www2.census.gov/programs-surveys/popest/dat
          Annual.Deaths=DEATHS2019, 
          Area) %>%
   mutate(Population.Density = round(Population / Area, 3)) %>%
-   as_tibble()
+  as_tibble()
+
+# Correct some data from NYC: New York County is reported for all of New York City.
+nyc <- filter(population_data, State == 'New York' & (CTYNAME %in% c('Bronx County', 'Kings County', 'Queens County', 'Richmond County', 'New York County'))) %>%
+  select(Population, Annual.Deaths, Area) %>%
+  colSums()
+ny.row <- which(population_data$CTYNAME == 'New York County')
+population_data[ny.row, 'Population'] <- nyc['Population']
+population_data[ny.row, 'Annual.Deaths'] <- nyc['Annual.Deaths']
+population_data[ny.row, 'Area'] <- nyc['Area']
+# Remove other boroughs since we don't get data for them.
+population_data <- filter(population_data, 
+                          State != 'New York' | !(CTYNAME %in% c('Bronx County', 'Kings County', 'Queens County', 'Richmond County'))) 
 
 counties <- filter(population_data, CountyCode > 0) %>% select(-State, -CTYNAME)
 states <- filter(population_data, CountyCode == 0) %>% select(-CountyCode)
-rm(regions, divisions, population_data)
+rm(regions, divisions, population_data, nyc)
+
 ```
 
 ### Load CovidTracking data

@@ -150,6 +150,24 @@ cvdata.i18n %>%
         axis.text.x = element_blank())
   #scale_y_log10()
 ```
+
+### International Summary
+
+```{r}
+as_of <- end_date
+totals <- filter(cvdata.i18n, Date == as_of) %>%
+  select(Cases, Deaths, Recovered, Population) %>%
+  colSums()
+```
+As of `r format(as_of, "%A, %B %e, %Y")`, the total number of confirmed cases worldwide is `r comma(signif(totals['Cases'], 3))`.
+
+The total number of deaths is `r comma(signif(totals['Deaths'], 3))`.
+
+The number of reported recoveries is `r comma(signif(totals['Recovered'], 3))`.
+
+The overall mortality rate based on reported deaths and confirmed cases is `r percent(signif(totals['Deaths']/totals['Cases'], 2))`.
+
+
 ### International Cases
 
 ```{r fig.width=6}
