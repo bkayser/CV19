@@ -133,14 +133,14 @@ cvdata.i18n %>%
 ```{r fig.width=5, fig.height=4}
 
 cvdata.i18n %>%
-  filter(Date == end_date, Cases.Growth3 > 0) %>%
-  arrange(desc(Cases.Growth3)) %>%
+  filter(Date == end_date, Cases.Growth5 > 0) %>%
+  arrange(desc(Cases.Growth5)) %>%
   head(50) %>%
   ggplot() +
-  aes(x=reorder(Key, Cases.Growth3), y=Cases.Growth3, fill=Cases.Growth3) +
+  aes(x=reorder(Key, Cases.Growth5), y=Cases.Growth5, fill=Cases.Growth5) +
   geom_col(show.legend=F) +
   scale_fill_gradient(low='#00FFAA', high='red', trans='log10') +
-  geom_text(aes(label=percent(round(Cases.Growth3, 3))), size=4, nudge_y=0.008) +
+  geom_text(aes(label=percent(round(Cases.Growth5, 3))), size=4, nudge_y=0.008) +
   coord_flip() +  
   xlab(NULL) +
   ylab('Growth in Confirmed Cases') +
@@ -191,7 +191,7 @@ g <- ggplot(bind_rows(d2)) +
   xlab("Days Since First 24 Deaths") +
   facet_wrap('Country')
 
-g + aes(y=Cases.Growth3) +
+g + aes(y=Cases.Growth5) +
   ylab("Daily Increase in Cases") +
   scale_y_continuous(labels=percent) 
 

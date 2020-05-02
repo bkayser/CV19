@@ -54,31 +54,33 @@ calculate_differentials <- function(infection_data, target_variables) {
   infection_data <- arrange(infection_data, Key, Date)
   boundaries <- which(infection_data$Key[2:nrow(infection_data)] != infection_data$Key[1:nrow(infection_data)-1])
   target_variables.diff <- paste0(target_variables, '.Diff')
-  target_variables.diff3 <- paste0(target_variables, '.Diff3')
+  target_variables.diff5 <- paste0(target_variables, '.Diff5')
   # Calculate 1 day differential  
   X1 <- infection_data[, target_variables]
   X0 <- infection_data[c(1, (1:nrow(X1)-1)), target_variables]
   infection_data[, target_variables.diff] <- X1 - X0
   
-  # Calculate the 3 day differential
+  # Calculate the 5 day differential
   X1 <- infection_data[ , target_variables]
-  X0 <- infection_data[c(1, 1, 1, 1:(nrow(X1)-3)), target_variables]
-  infection_data[, target_variables.diff3] <- round((X1 - X0) / 3.0)
+  X0 <- infection_data[c(1, 1, 1, 1, 1, 1:(nrow(X1)-5)), target_variables]
+  infection_data[, target_variables.diff5] <- round((X1 - X0) / 5.0)
   
   infection_data[boundaries + 1, target_variables.diff] <- 0
   infection_data[c(boundaries + 1,
                    boundaries + 2,
-                   boundaries + 3), target_variables.diff3] <- 0
+                   boundaries + 3,
+                   boundaries + 4, 
+                   boundaries + 5), target_variables.diff5] <- 0
 
   for (var in 1:length(target_variables)) {
     target_var <- target_variables[var]
-    target_var.diff3 <- target_variables.diff3[var]
-    growth_var <- paste0(target_var, '.Growth3')
-    rate_var <- paste0(target_var, '.Diff3.Per100K')
+    target_var.diff5 <- target_variables.diff5[var]
+    growth_var <- paste0(target_var, '.Growth5')
+    rate_var <- paste0(target_var, '.Diff5.Per100K')
     per_capita_var <- paste0(target_var, '.Per100K')
-    growth_rows <- (infection_data[,target_var.diff3] != 0 & infection_data[,target_var] != 0)[,1]
-    infection_data[growth_rows, growth_var]     <- round(infection_data[growth_rows, target_var.diff3] / infection_data[growth_rows, target_var], 4)
-    infection_data[growth_rows, rate_var]       <- infection_data[growth_rows, target_var.diff3] * 100000 / infection_data$Population[growth_rows]
+    growth_rows <- (infection_data[,target_var.diff5] != 0 & infection_data[,target_var] != 0)[,1]
+    infection_data[growth_rows, growth_var]     <- round(infection_data[growth_rows, target_var.diff5] / infection_data[growth_rows, target_var], 4)
+    infection_data[growth_rows, rate_var]       <- infection_data[growth_rows, target_var.diff5] * 100000 / infection_data$Population[growth_rows]
     infection_data[, per_capita_var] <- round(signif(infection_data[, target_var] * 100000 / infection_data$Population, 3))
     infection_data[!growth_rows, c(growth_var, rate_var) ] <- list(0,0)
   }

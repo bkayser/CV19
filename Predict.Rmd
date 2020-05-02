@@ -80,7 +80,7 @@ Here's what that chart looks like.
 ```{r fig.height=3, fig.width=5}
 cvdata.i18n %>% filter(Country %in% c('Italy', 'China, Hubei', 'Korea, South', 'US', 'Spain')) %>%
   ggplot() +
-  aes(x=Date, y=Cases.Growth3, color=Country) +
+  aes(x=Date, y=Cases.Growth5, color=Country) +
   geom_line() +
   ggtitle("Growth Rate in Cases over Time") +
   ylab("Daily Growth in Cases") +
@@ -114,15 +114,15 @@ major_countries <-
 
 peak_growth <- 
   semi_join(major_countries, 
-            group_by(major_countries, Country) %>% summarize(Cases.Growth3 = max(Cases.Growth3)),
-            by=c('Country', 'Cases.Growth3')) %>%
+            group_by(major_countries, Country) %>% summarize(Cases.Growth5 = max(Cases.Growth5)),
+            by=c('Country', 'Cases.Growth5')) %>%
   select(Country, Date)
 
 start_dates <- peak_growth$Date
 names(start_dates) <- as.character(peak_growth$Country)
 
 target_growth <- 
-  filter(major_countries, Cases > 500 & Cases.Growth3 < 0.014 & Date > start_dates[Country]) %>%
+  filter(major_countries, Cases > 500 & Cases.Growth5 < 0.014 & Date > start_dates[Country]) %>%
   group_by(Country) %>%
   summarize(Date = min(Date))
 
@@ -147,12 +147,12 @@ countries.pred_window <- lapply(countries.list, function(table) {
 extrapolate.lm <- function(df) {
   t0 <- min(df$Date) 
   model <- tail(df, 20) %>%
-    lm(formula = Cases.Growth3 ~ Day)
+    lm(formula = Cases.Growth5 ~ Day)
   x_intercept <- ceiling(-model$coefficients[1]/model$coefficients[2])
   prediction <- tibble(Country = df$Country[1],
                        Day = 0:x_intercept)
   p <- predict(model, prediction, se.fit = T)
-  prediction$Cases.Growth3 <- p$fit
+  prediction$Cases.Growth5 <- p$fit
   prediction$Date <- t0 + days(round(prediction$Day))
   prediction$Day.Upper <- prediction$Day + p$se.fit
   prediction$Day.Lower <- prediction$Day - p$se.fit
@@ -182,7 +182,7 @@ prediction_data <- list(country_data=country_data,
 filtered_data <- lapply(prediction_data, function(data) { filter(data, Country %in% display_countries) })
 
 ggplot(filtered_data[['country_data']]) +
-  aes(x=Day, y=Cases.Growth3, color=Country) +
+  aes(x=Day, y=Cases.Growth5, color=Country) +
   geom_line(show.legend = F) +
   geom_line(data=filtered_data[['predictions.country']], color='black', size=0.5, linetype=3) +
   geom_vline(data=filtered_data[['predictions.country.target_day']], aes(xintercept = Day), color='darkgreen', size=0.5, alpha=0.5) +
@@ -204,14 +204,14 @@ rm(filtered_data, country_data, major_countries, peak_growth, target_growth, sta
 filtered_data <- lapply(prediction_data, function(data) { filter(data, Country %in% c("Germany", "India", "Russia", "US", "United Arab Emerates")) })
 
 ggplot(filtered_data[['country_data']]) +
-  aes(x=Day, y=Cases.Growth3, color=Country) +
+  aes(x=Day, y=Cases.Growth5, color=Country) +
   geom_line(show.legend = T) +
   scale_y_continuous(labels=percent) +
   theme(strip.text.x = element_text(face='bold', size=9)) +
   ggtitle(paste0("National Trends as of ",format(end_date, "%B %e, %Y")), subtitle="Plotted individually from the first day with more than 500 cases") +
   xlab("Days Since First 500 Cases") +
   ylab("Daily Increase in Cases") +
-  geom_label(aes(label=percent(Cases.Growth3)), data=~tail(arrange(.x, Date), 4), nudge_y=0.01, show.legend = F) +
+  geom_label(aes(label=percent(Cases.Growth5)), data=~tail(arrange(.x, Date), 4), nudge_y=0.01, show.legend = F) +
   coord_cartesian(xlim=c(0, 50)) +
   theme(legend.position = c(0.8, 0.8),
         panel.grid=element_blank(),
@@ -242,13 +242,13 @@ state_selection <-  c("New York", "Oregon", "California", "New Jersey", "Arizona
                       "Rhode Island", "South Dakota", "Massachusetts")
 training_window <- 20
 
-states.filtered <- filter(cvdata.us.by_state, Cases > 100 & Cases.Growth3 > 0.010) %>%
+states.filtered <- filter(cvdata.us.by_state, Cases > 100 & Cases.Growth5 > 0.010) %>%
   mutate(State = fct_drop(State))
 
 peak_growth <- 
   semi_join(states.filtered, 
-            group_by(states.filtered, State) %>% summarize(Cases.Growth3 = max(Cases.Growth3)),
-            by=c('State', 'Cases.Growth3')) %>%
+            group_by(states.filtered, State) %>% summarize(Cases.Growth5 = max(Cases.Growth5)),
+            by=c('State', 'Cases.Growth5')) %>%
   select(State, Date)
 
 start_dates <- peak_growth$Date
@@ -271,12 +271,12 @@ states.pred_window <- lapply(states.list, function(table) {
 extrapolate.lm <- function(df) {
   t0 <- min(df$Date) 
   model <- tail(df, training_window) %>%
-    lm(formula = Cases.Growth3 ~ Day)
+    lm(formula = Cases.Growth5 ~ Day)
   x_intercept <- ceiling(-model$coefficients[1]/model$coefficients[2])
   prediction <- tibble(State = df$State[1],
                        Day = 0:x_intercept)
   p <- predict(model, prediction, se.fit = T)
-  prediction$Cases.Growth3 <- p$fit
+  prediction$Cases.Growth5 <- p$fit
   prediction$Date <- t0 + days(round(prediction$Day))
   prediction$Day.Upper <- prediction$Day + p$se.fit
   prediction$Day.Lower <- prediction$Day - p$se.fit
@@ -304,7 +304,7 @@ state_data <- lapply(states.list, function(table) {
   filter(State %in% state_selection)
 
 ggplot(state_data) +
-  aes(x=Day, y=Cases.Growth3, color=State) +
+  aes(x=Day, y=Cases.Growth5, color=State) +
   geom_line(show.legend = F) +
   geom_line(data=predictions.state, color='black', size=0.5, linetype=3) +
   geom_vline(data=predictions.state.target_day, aes(xintercept = Day), linetype=5, color='darkgreen', size=0.5, alpha=0.5) +

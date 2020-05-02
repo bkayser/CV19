@@ -165,7 +165,7 @@ g <- cvdata.us.by_state %>%
   mutate(State = factor(State, levels=topstates)) %>%
   arrange(State, Date) %>%
   ggplot() +
-  aes(Date, Cases.Diff3/Population, color=State, fill=State) +
+  aes(Date, Cases.Diff5/Population, color=State, fill=State) +
   geom_line() + 
   geom_smooth(alpha=0.1, method='lm', formula= y ~ poly(x,4), fullrange=T, span=0.2, size=0.5, linetype=3) +
   ggtitle('Cases Day to Day Change in Top 5 States',
@@ -204,11 +204,11 @@ cvdata.us.by_state %>%
 cvdata.or <- filter(cvdata.us.by_state, State.Code == 'OR')
 
 g <- ggplot(cvdata.or) +
-  aes(Date, Cases.Diff3) +
+  aes(Date, Cases.Diff5) +
   geom_line(color='blue') + 
-  geom_text(aes(label=Cases.Diff3), color='black', nudge_y=3) +
+  geom_text(aes(label=Cases.Diff5), color='black', nudge_y=3) +
   geom_smooth(alpha=0.1, method='lm', color='blue', fill='blue', formula= y ~ poly(x,4), fullrange=T, span=0.2, size=0.5, linetype=3) +
-  ggtitle('Oregon Change in Confirmed Cases, Three Day Average',
+  ggtitle('Oregon Change in Confirmed Cases, Five Day Average',
           subtitle = str_c("Reported data through ", format(max(cvdata.us$Date), "%B %d, %Y"))) +
   ylab("Daily Increase") +
   geom_text(data=~ tail(.x, 1), aes(y=Deaths, label=Deaths), color='red', size=8, nudge_y=4, show.legend = T) +
@@ -224,10 +224,10 @@ g
 ```{r echo=F, fig.height=4, fig.width=5}
 
 g <- ggplot(cvdata.or) +
-  aes(Date, Deaths.Diff3) +
+  aes(Date, Deaths.Diff5) +
   geom_line(color='blue') + 
   geom_smooth(alpha=0.1, method='lm', color='blue', fill='blue', formula= y ~ poly(x,4), fullrange=T, span=0.2, size=0.5, linetype=3) +
-  ggtitle('Oregon Change Deaths, Three Day Average',
+  ggtitle('Oregon Change Deaths, Five Day Average',
           subtitle = str_c("Reported data through ", format(max(cvdata.us$Date), "%B %d, %Y"))) +
   ylab("Daily Increase") +
   xlab(NULL)  +
