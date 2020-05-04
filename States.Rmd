@@ -62,9 +62,6 @@ if (date.breaks[1] != start_date) {
 
 ### Top Counties in Cases per Capita:
 ```{r}
-
-cvdata.us %>% filter(Key == 'New York City, New York, US' & Date == end_date)
-
 cvdata.us %>%
   filter(!is.na(Division) & Date == end_date & Population > 5000) %>%
   arrange(desc(Cases.Per100K)) %>%
@@ -194,6 +191,29 @@ cvdata.us.by_state %>%
   xlab(NULL)  +
   coord_cartesian(xlim=c(start_date, end_date)) +
   scale_x_date(breaks=date.breaks, date_labels = '%m/%d', date_minor_breaks='1 day')
+
+```
+
+## Georgia
+
+
+```{r echo=F, fig.height=4, fig.width=5}
+cvdata.ga <- filter(cvdata.us.by_state, State.Code == 'GA')
+
+g <- ggplot(cvdata.ga) +
+  aes(Date, Cases.Diff5) +
+  geom_line(color='blue') + 
+  geom_text(aes(label=Cases.Diff5), color='black', nudge_y=3) +
+  geom_smooth(alpha=0.1, method='lm', color='blue', fill='blue', formula= y ~ poly(x,4), fullrange=T, span=0.2, size=0.5, linetype=3) +
+  ggtitle('Georgia Change in Confirmed Cases, Five Day Average',
+          subtitle = str_c("Reported data through ", format(max(cvdata.us$Date), "%B %d, %Y"))) +
+  ylab("Daily Increase") +
+  geom_text(data=~ tail(.x, 1), aes(y=Deaths, label=Deaths), color='red', size=8, nudge_y=4, show.legend = T) +
+  xlab(NULL)  +
+  geom_line(aes(y=Deaths), color='red') +
+  coord_cartesian(xlim=c(ymd('2020-03-15'), end_date)) +
+  scale_x_date(breaks=date.breaks, date_labels = '%m/%d', date_minor_breaks='1 day')
+g
 
 ```
 
@@ -435,7 +455,7 @@ g <- split(history.1, history.1$Region) %>%
       geom_point(show.legend = F, size=0.6) +
       scale_y_continuous(labels=percent) +
       geom_label(data=df.current, aes(label=State.Code), show.legend=F) +
-      coord_cartesian(xlim=c(0, 4100)) 
+      coord_cartesian(xlim=c(0, max(testdata$Tests.Per.Capita))) 
   }) 
 
 g

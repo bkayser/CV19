@@ -50,8 +50,8 @@ read_and_clean <- function(infile) {
   return(cv.wide)
 }
 
-calculate_differentials <- function(infection_data, target_variables) {
-  infection_data <- arrange(infection_data, Key, Date)
+calculate_differentials <- function(id, target_variables) {
+  infection_data <- arrange(id, Key, Date)
   boundaries <- which(infection_data$Key[2:nrow(infection_data)] != infection_data$Key[1:nrow(infection_data)-1])
   target_variables.diff <- paste0(target_variables, '.Diff')
   target_variables.diff5 <- paste0(target_variables, '.Diff5')
@@ -63,7 +63,7 @@ calculate_differentials <- function(infection_data, target_variables) {
   # Calculate the 5 day differential
   X1 <- infection_data[ , target_variables]
   X0 <- infection_data[c(1, 1, 1, 1, 1, 1:(nrow(X1)-5)), target_variables]
-  infection_data[, target_variables.diff5] <- round((X1 - X0) / 5.0)
+  infection_data[, target_variables.diff5] <- round((X1 - X0) / 5.0, 1)
   
   infection_data[boundaries + 1, target_variables.diff] <- 0
   infection_data[c(boundaries + 1,

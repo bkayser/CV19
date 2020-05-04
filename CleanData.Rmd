@@ -105,7 +105,7 @@ population_data <- filter(population_data,
 
 counties <- filter(population_data, CountyCode > 0) %>% select(-State, -CTYNAME)
 states <- filter(population_data, CountyCode == 0) %>% select(-CountyCode)
-rm(regions, divisions, population_data, nyc)
+rm(regions, divisions, population_data, nyc, ny.row)
 
 ```
 
