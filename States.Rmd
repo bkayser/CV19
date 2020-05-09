@@ -156,19 +156,21 @@ Right now you can see New York is a long way from that but the LOESS trend line 
 
 
 ```{r echo=F, fig.height=4, fig.width=5}
-topstates <- c('South Dakota',as.character(Cases.top.10[1:5]))
+#topstates <- c('South Dakota',as.character(Cases.top.10[1:5]))
+topstates <- c('New York', 'Indiana', 'California', 'Oregon', 'Arizona')
 g <- cvdata.us.by_state %>% 
   filter(State %in%  topstates) %>%
   mutate(State = factor(State, levels=topstates)) %>%
   arrange(State, Date) %>%
   ggplot() +
-  aes(Date, Cases.Diff5/Population, color=State, fill=State) +
+  aes(Date, Cases.Diff5, color=State, fill=State) +
   geom_line() + 
   geom_smooth(alpha=0.1, method='lm', formula= y ~ poly(x,4), fullrange=T, span=0.2, size=0.5, linetype=3) +
   ggtitle('Cases Day to Day Change in Top 5 States',
           subtitle = str_c("Reported data through ", format(max(cvdata.us$Date), "%B %d, %Y"))) +
   ylab("Daily Increase") +
   xlab(NULL)  +
+  scale_y_continuous(labels = comma) +
   coord_cartesian(xlim=c(ymd('2020-03-15'), end_date)) +
   scale_x_date(breaks=date.breaks, date_labels = '%m/%d', date_minor_breaks='1 day')
 g
@@ -234,7 +236,7 @@ g <- ggplot(cvdata.or) +
   geom_text(data=~ tail(.x, 1), aes(y=Deaths, label=Deaths), color='red', size=8, nudge_y=4, show.legend = T) +
   xlab(NULL)  +
   geom_line(aes(y=Deaths), color='red') +
-  coord_cartesian(xlim=c(ymd('2020-03-15'), end_date), ylim=c(0, 100)) +
+  coord_cartesian(xlim=c(ymd('2020-03-15'), end_date), ylim=c(0, 125)) +
   scale_x_date(breaks=date.breaks, date_labels = '%m/%d', date_minor_breaks='1 day')
 g
 
