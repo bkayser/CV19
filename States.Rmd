@@ -222,23 +222,34 @@ g
 ## Oregon
 
 
-```{r echo=F, fig.height=4, fig.width=5}
-cvdata.or <- filter(cvdata.us.by_state, State.Code == 'OR')
-
-g <- ggplot(cvdata.or) +
-  aes(Date, Cases.Diff5) +
+```{r echo=F, fig.height=3.5, fig.width=4}
+filter(cvdata.us.by_state, State.Code == 'OR') %>%
+  mutate(Daily.Increase=round(Cases.Diff5)) %>%
+  ggplot() +
+  aes(x=Date, y=Cases.Diff5) +
   geom_line(color='blue') + 
-  geom_text(aes(label=Cases.Diff5), color='black', nudge_y=3) +
-  geom_smooth(alpha=0.1, method='lm', color='blue', fill='blue', formula= y ~ poly(x,4), fullrange=T, span=0.2, size=0.5, linetype=3) +
+  geom_text(aes(label=Daily.Increase), 
+            #position=position_dodge(8),
+            nudge_y=4,
+            check_overlap=T,
+            color='black') +
+  #geom_smooth(alpha=0.1, method='lm', color='blue', fill='blue', formula= y ~ poly(x,4), fullrange=T, span=0.2, size=0.5, linetype=3) +
+  geom_smooth(alpha=0.05, method='loess', color='blue', fill='blue', fullrange=T, span=0.5, size=0.5, linetype=3) +
   ggtitle('Oregon Change in Confirmed Cases, Five Day Average',
           subtitle = str_c("Reported data through ", format(max(cvdata.us$Date), "%B %d, %Y"))) +
   ylab("Daily Increase") +
-  geom_text(data=~ tail(.x, 1), aes(y=Deaths, label=Deaths), color='red', size=8, nudge_y=4, show.legend = T) +
+  geom_text(data=~ tail(.x, 1), aes(y=Deaths, label=paste0('Total Deaths: ',Deaths)), 
+            #position='dodge', 
+            color='red', 
+            size=6, 
+            nudge_y=-5, 
+            nudge_x=-12, 
+            show.legend = T) +
   xlab(NULL)  +
   geom_line(aes(y=Deaths), color='red') +
   coord_cartesian(xlim=c(ymd('2020-03-15'), end_date), ylim=c(0, 125)) +
-  scale_x_date(breaks=date.breaks, date_labels = '%m/%d', date_minor_breaks='1 day')
-g
+  scale_x_date(breaks=date.breaks, date_labels = '%m/%d', date_minor_breaks='1 day') +
+  theme_stata()
 
 ```
 
@@ -423,6 +434,61 @@ ggplot(testdata) +
 
 ```
 
+```{r, fig.width=4, fig.height=3.5}
+
+window_width <- 4
+timerange <- 28
+history <- filter(testdata.ts, 
+                  !is.na(totalTestResultsIncrease) &                  # Filter missing values
+                    totalTestResultsIncrease > 0 &                    # Filter missing values
+                    Date > today() - days(timerange))                 # Recent data only
+history.1 <- split(history, history$State) %>% lapply(function(df) {
+  arrange(df, Date) %>%
+  mutate(positiveRate = positiveIncrease / totalTestResultsIncrease,
+         positiveRateMA = runmean(positiveIncrease, k = window_width, endrule='NA', align='right') /
+           runmean(totalTestResultsIncrease, k = window_width, endrule='NA', align='right'))
+}) %>% 
+  bind_rows() %>%
+  filter(positiveRateMA < 0.55)  # Remove outliers
+
+filter(history.1, State %in% c('Washington', 'California', 'Arizona', 'Oregon')) %>%
+  ggplot() +
+  aes(x=Tests.Per.Capita, y=positiveRateMA, color=State) +
+  ggtitle(subtitle = paste0(window_width, ' day moving average over last ', timerange, ' days'),
+          paste0('Per Capita Testing vs. Test Positive Rate for West Coast States')) +
+  xlab('Tests per 100K Population') +
+  ylab('Rate of Positive Tests') +
+  geom_line(show.legend = F, size=0.2) +
+  geom_point(show.legend = F, size=0.6) +
+  scale_y_continuous(labels=percent) +
+  geom_label(data=~group_by(.x, State.Code) %>% summarize(State = last(State),
+                                                          Date = last(Date),
+                                                          positiveRateMA=last(positiveRateMA),
+                                                          Tests.Per.Capita=last(Tests.Per.Capita)),
+             aes(label=State.Code), show.legend=F)  +
+  theme_stata()#+
+
+
+filter(history.1, State %in% c('Oregon', 'New York', 'New Jersey', 'Massachusetts')) %>%
+  ggplot() +
+  aes(x=Tests.Per.Capita, y=positiveRateMA, color=State) +
+  ggtitle(subtitle = paste0(window_width, ' day moving average over last ', timerange, ' days'),
+          paste0('Per Capita Testing vs. Test Positive Rate')) +
+  xlab('Tests per 100K Population') +
+  ylab('Rate of Positive Tests') +
+  geom_line(show.legend = F, size=0.2) +
+  geom_point(show.legend = F, size=0.6) +
+  scale_y_continuous(labels=percent) +
+  geom_label(data=~group_by(.x, State.Code) %>% summarize(State = last(State),
+                                                          Date = last(Date),
+                                                          positiveRateMA=last(positiveRateMA),
+                                                          Tests.Per.Capita=last(Tests.Per.Capita)),
+             aes(label=State.Code), show.legend=F)  +
+  theme_stata()#+
+
+
+```
+
 ```{r, fig.width=5, fig.height=4}
 
 window_width <- 4
@@ -456,8 +522,8 @@ g <- split(history.1, history.1$Region) %>%
       geom_line(show.legend = F, size=0.2) +
       geom_point(show.legend = F, size=0.6) +
       scale_y_continuous(labels=percent) +
-      geom_label(data=df.current, aes(label=State.Code), show.legend=F) +
-      coord_cartesian(xlim=c(0, max(testdata$Tests.Per.Capita))) 
+      geom_label(data=df.current, aes(label=State.Code), show.legend=F) #+
+      #coord_cartesian(xlim=c(0, max(testdata$Tests.Per.Capita))) 
   }) 
 
 g
