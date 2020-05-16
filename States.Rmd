@@ -65,7 +65,8 @@ if (date.breaks[1] != start_date) {
 cvdata.us %>%
   filter(!is.na(Division) & Date == end_date & Population > 5000) %>%
   arrange(desc(Cases.Per100K)) %>%
-  select(Key, Cases.Per100K, Deaths.Per100K) %>%
+  mutate(Label=paste0(County,", ", State.Code)) %>%
+  select(Label, Cases.Per100K, Deaths.Per100K) %>%
   top_n(25) %>% knitr::kable(col.names=c('County', 'Cases Per 100K', 'Deaths Per 100K'))
 ```
 
@@ -76,7 +77,8 @@ cvdata.us %>%
 cvdata.us %>%
   filter(!is.na(Division) & Date == end_date & Population > 1000) %>%
   arrange(desc(Deaths.Per100K)) %>%
-  select(Key,Deaths.Per100K) %>%
+  mutate(Label=paste0(County,", ", State.Code)) %>%
+  select(Label,Deaths.Per100K) %>%
   top_n(25) %>% knitr::kable(col.names=c('County', 'Deaths Per 100K'))
 ```
 
@@ -205,7 +207,7 @@ cvdata.ga <- filter(cvdata.us.by_state, State.Code == 'GA')
 g <- ggplot(cvdata.ga) +
   aes(Date, Cases.Diff5) +
   geom_line(color='blue') + 
-  geom_text(aes(label=Cases.Diff5), color='black', nudge_y=3) +
+  geom_text(aes(label=round(Cases.Diff5)), color='black', nudge_y=3) +
   geom_smooth(alpha=0.1, method='lm', color='blue', fill='blue', formula= y ~ poly(x,4), fullrange=T, span=0.2, size=0.5, linetype=3) +
   ggtitle('Georgia Change in Confirmed Cases, Five Day Average',
           subtitle = str_c("Reported data through ", format(max(cvdata.us$Date), "%B %d, %Y"))) +
@@ -223,9 +225,9 @@ g
 
 
 ```{r echo=F, fig.height=3.5, fig.width=4}
-filter(cvdata.us.by_state, State.Code == 'OR') %>%
-  mutate(Daily.Increase=round(Cases.Diff5)) %>%
-  ggplot() +
+cvdata.or <- filter(cvdata.us.by_state, State.Code == 'OR') %>%
+  mutate(Daily.Increase=round(Cases.Diff5)) 
+ggplot(cvdata.or) +
   aes(x=Date, y=Cases.Diff5) +
   geom_line(color='blue') + 
   geom_text(aes(label=Daily.Increase), 
@@ -247,7 +249,7 @@ filter(cvdata.us.by_state, State.Code == 'OR') %>%
             show.legend = T) +
   xlab(NULL)  +
   geom_line(aes(y=Deaths), color='red') +
-  coord_cartesian(xlim=c(ymd('2020-03-15'), end_date), ylim=c(0, 125)) +
+  coord_cartesian(xlim=c(ymd('2020-03-15'), end_date)) +
   scale_x_date(breaks=date.breaks, date_labels = '%m/%d', date_minor_breaks='1 day') +
   theme_stata()
 
