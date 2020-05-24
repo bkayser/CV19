@@ -115,7 +115,7 @@ cvdata.i18n %>%
   aes(x=reorder(Key, Cases.Per100K), y=Cases.Per100K, fill=Cases.Per100K) +
   geom_col() +
   scale_fill_gradient(low='#00FFAA', high='red', trans='log10') +
-  geom_text(aes(label=round(Cases.Per100K)), size=4, nudge_y=30) +
+  geom_text(aes(label=round(Cases.Per100K)), size=4, nudge_y=45) +
   coord_flip() +  
   xlab(NULL) +
   ylab('Cases per 100K Population') +
@@ -136,7 +136,7 @@ cvdata.i18n %>%
   aes(x=reorder(Key, Cases), y=Cases, fill=Cases) +
   geom_col() +
   scale_fill_gradient(low='#00FFAA', high='red', trans='log10') +
-  geom_text(aes(label=round(Cases)), size=4, nudge_y=30) +
+  geom_text(aes(label=comma(signif(Cases, 3))), size=4, nudge_y=80000) +
   coord_flip() +  
   xlab(NULL) +
   ylab('Confirmed Cases') +
@@ -160,7 +160,7 @@ cvdata.i18n %>%
   aes(x=reorder(Key, Cases.Growth5), y=Cases.Growth5, fill=Cases.Growth5) +
   geom_col(show.legend=F) +
   scale_fill_gradient(low='#00FFAA', high='red', trans='log10') +
-  geom_text(aes(label=percent(round(Cases.Growth5, 3))), size=4, nudge_y=0.008) +
+  geom_text(aes(label=percent(round(Cases.Growth5, 3))), size=4, nudge_y=0.006) +
   coord_flip() +  
   xlab(NULL) +
   ylab('Growth in Confirmed Cases') +

@@ -78,9 +78,49 @@ cvdata.us %>%
   filter(!is.na(Division) & Date == end_date & Population > 1000) %>%
   arrange(desc(Deaths.Per100K)) %>%
   mutate(Label=paste0(County,", ", State.Code)) %>%
-  select(Label,Deaths.Per100K) %>%
-  top_n(25) %>% knitr::kable(col.names=c('County', 'Deaths Per 100K'))
+  select(Label,Deaths, Deaths.Per100K) %>%
+  top_n(25) %>% knitr::kable(col.names=c('County', 'Total Deaths', 'Deaths Per 100K'))
 ```
+
+### Hotspots
+
+```{r fig.height=5, fig.width=4}
+hotspots <- cvdata.us %>%
+  mutate(Label=paste0(County,", ", State.Code)) %>%
+  filter(!is.na(Division) & Date == end_date & Population > 1000 & Cases > 50) %>%
+  arrange(desc(Cases.Growth5)) %>%
+  head(50) 
+
+ggplot(hotspots) +
+  aes(x=reorder(Label, Cases.Growth5), y=Cases.Growth5, fill=State.Code) +
+  geom_col(show.legend=F) +
+  scale_y_continuous(position = 'right') +
+  geom_text(aes(label=percent(Cases.Growth5)), size=4, nudge_y=0.01) +
+  coord_flip() + 
+  ylab('Average Growth 5 Day Moving Average') +
+  xlab(NULL) +
+  theme(line = element_blank(), 
+        panel.border = element_blank(),
+        axis.text.x = element_blank(),
+        legend.position=c(0.5,0.5))
+
+```
+
+```{r}
+cvdata.us %>%
+  filter(Key %in% hotspots$Key[1:8]) %>%
+  mutate(Label=reorder(as.factor(paste0(County,", ", State.Code)), Cases.Growth5)) %>%
+  ggplot() +
+  aes(x=Date, y=Cases, color=Label) +
+  geom_line() +
+  coord_cartesian(xlim=c(mdy('04-21-2020'), end_date)) +
+  ggtitle("Confirmed Cases in Top 8 Hotspots") +
+  xlab(NULL) +
+  theme(legend.title=element_blank())
+
+rm(hotspots)  
+```
+
 
 ## Confirmed Case History in Top 10 States
 
@@ -292,7 +332,7 @@ averages.by_state <- tapply(today$Cases.Per100K, today$State.Code, median) %>% s
 ggplot(today) +
   aes(x = fct_relevel(State.Code, names(averages.by_state)), y = Cases.Per100K, fill = Region) +
   geom_boxplot() +
-  coord_flip(ylim=c(0,1200)) +
+  coord_flip(ylim=c(0,2000)) +
   ggtitle("") +
   ggtitle('Cases Per Capita for Counties, State by State')
 
