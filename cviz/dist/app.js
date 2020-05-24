@@ -1,22 +1,23 @@
 // d3 = require("d3@5")
 
 d3.json("sample.json").then(data => {
-    pack = data => d3.pack()
+    const pack = data => d3.pack()
         .size([width, height])
         .padding(3)
     (d3.hierarchy(data)
      .sum(d => d.value)
      .sort((a, b) => b.value - a.value))
 
-    width = 932
-    height = width
-    format = d3.format(",d")
-    color = d3.scaleLinear()
-        .domain([0, 5])
-        .range(["hsl(152,80%,80%)", "hsl(228,30%,40%)"])
+    const width = 932
+    const height = width
+    //format = d3.format(",d")
+    const root = pack(data);
+    const color = d3.scaleLinear()
+        .domain([0, root.height])
+//        .range(["hsl(152,80%,80%)", "hsl(228,30%,40%)"])
+        .range(["hsl(152,80%,80%)", "hsl(228,30%,70%)"])
         .interpolate(d3.interpolateHcl)
 
-    const root = pack(data);
     let focus = root;
     let view;
 
@@ -32,14 +33,17 @@ d3.json("sample.json").then(data => {
           .selectAll("circle")
           .data(root.descendants().slice(1))
           .join("circle")
-          .attr("fill", d => d.children ? color(d.depth) : "white")
-          .attr("pointer-events", d => !d.children ? "none" : null)
-          .on("mouseover", function() { d3.select(this).attr("stroke", "#000"); })
-          .on("mouseout", function() { d3.select(this).attr("stroke", null); })
+//          .attr("fill", d => d.children ? color(d.depth) : "white")
+          .attr("fill", d => d.children ? color(d.depth) : null)
+          .attr("class", d => d.children ? "parent" : "leaf")
+          .attr("pointer-events", d => d.children ? null : "none")
+          .on("mouseover", function(){ d3.select(this).attr("stroke", "#000"); })
+          .on("mouseout", function(){ d3.select(this).attr("stroke", null); })
           .on("click", d => focus !== d && (zoom(d), d3.event.stopPropagation()));
 
     const label = svg.append("g")
-          .style("font", "10px sans-serif")
+          .attr("class", "label")
+//          .style("font", "10px sans-serif")
           .attr("pointer-events", "none")
           .attr("text-anchor", "middle")
           .selectAll("text")
@@ -48,6 +52,7 @@ d3.json("sample.json").then(data => {
           .style("fill-opacity", d => d.parent === root ? 1 : 0)
           .style("display", d => d.parent === root ? "inline" : "none")
           .text(d => d.data.name);
+
 
     zoomTo([root.x, root.y, root.r * 2]);
 

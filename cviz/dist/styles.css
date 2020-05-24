@@ -3,9 +3,20 @@ body {
   overflow: hidden;
 }
 
-text {
-  font: 10px sans-serif;
-  text-anchor: middle;
+
+h1 {
+    font: 96px sans-serif;
+    color: red;
+}
+
+circle.leaf {
+    fill: green;
+    fill-opacity: 0.1;
+}
+
+.label text {
+    font: 16px sans-serif;
+    font-color: "red";
 }
 
 .node--hover circle {
