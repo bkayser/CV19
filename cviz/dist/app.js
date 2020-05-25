@@ -39,10 +39,13 @@ d3.json("sample.json").then(data => {
           .style("cursor", "pointer")
           .on("click", () => zoom(root));
 
-    const node = svg.append("g")
-          .selectAll("circle")
+    const nodeContainer = svg.append("g")
+          .selectAll("g")
           .data(root.descendants().slice(1))
-          .join("circle")
+          .join("g")
+
+    const node = nodeContainer
+          .append("circle")
           .attr("fill", d => d.children ? color(d.depth) : hotspotColor(d.data.growth))
           .attr("class", d => d.children ? "parent" : "leaf")
           .attr("pointer-events", d => d.depth > 1 ? "none" : null)
