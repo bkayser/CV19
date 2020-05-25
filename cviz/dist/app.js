@@ -10,7 +10,7 @@ d3.json("sample.json").then(data => {
 
     const width = 932
     const height = width
-    const bgOpacity = 0.4   // Opacity of circles that are zoomed out
+    const bgOpacity = 0.6   // Opacity of circles that are zoomed out
     
     //format = d3.format(",d")
     const root = pack(data);
@@ -26,9 +26,10 @@ d3.json("sample.json").then(data => {
           .range(["hsl(94,34%,40%)", "hsl(360,100%,40%)"])
           .interpolate(d3.interpolateHcl)
 
+
     let focus = root;
     let view;
-    const fontSize = d3.scaleThreshold()
+    const fontSize = d => `${ (d.parent ? d.r * width / d.parent.r : d.r * width) / 6 }px`;
 
     const svg = d3.select("svg#top")
           .attr("viewBox", `-${width / 2} -${height / 2} ${width} ${height}`)
@@ -46,25 +47,30 @@ d3.json("sample.json").then(data => {
           .attr("class", d => d.children ? "parent" : "leaf")
           .attr("pointer-events", d => d.depth > 1 ? "none" : null)
           .attr("fill-opacity", d => d.depth > 1 ? bgOpacity : 1)
-          .on("mouseover", function(){ d3.select(this).attr("stroke", "#000"); })
+          .on("mouseover", function(d){
+              d3.select(this).attr("stroke", "#000");
+          })
           .on("mouseout", function(){ d3.select(this).attr("stroke", null); })
-          .on("click", d => focus !== d && (zoom(d), d3.event.stopPropagation()));
+          .on("click", d => { d3.event.stopPropagation(); focus === d ? zoom(d.parent) : zoom(d) })
+          .on("dblclick", () => zoom(root))
 
-    const label = svg.append("g")
+    const labelContainer = svg.append("g")
           .attr("class", "label")
           .attr("pointer-events", "none")
           .attr("text-anchor", "middle")
+
+    const label = labelContainer
           .selectAll("text")
           .data(root.descendants())
           .join("text")
-          .style("font-size", d => (d.parent ? d.r * width / d.parent.r : d.r * width) / 8)
+          .style("font-size", fontSize)
           .style("fill-opacity", d => d.parent === root ? 1 : 0)
           .style("display", d => d.parent === root ? "inline" : "none")
           .text(d => d.data.name);
 
 
     zoomTo([root.x, root.y, root.r * 2]);
-
+         
     function zoomTo(v) {
         const k = width / v[2];
 
@@ -98,17 +104,21 @@ d3.json("sample.json").then(data => {
         label
             .filter(function(d) { return d.parent === focus || this.style.display === "inline"; })
             .transition(zoomTransition)
-            .style("fill-opacity", d => d.parent === focus || (d === focus && !d.children) ? 1 : 0)
+            .style("fill-opacity", d => (d.parent !== focus && (d !== focus || d.children)) ? 0 : 1)
             .style("font-size", d => {
-                if (focus.children) { 
-                    return (d.parent ? d.r * width / d.parent.r : d.r * width) / 8
+                if (focus === d && d.height == 0) {
+                     // zoomed down to the count y
+                    return `${Math.min(80, width/12)}px`;
                 } else {
-                    // zoomed down to the count y
-                    return `${Math.min(64, width/12)}px`;
+                    return fontSize(d);
                 }
             })
-            .on("end", function(d) { if (d.parent === focus) this.style.display = "inline"; })
-            .on("start", function(d) { if (d.parent !== focus && (d !== focus || d.children)) this.style.display = "none"; });
+            .on("start", function(d) { if (d.parent === focus ||
+                                           (d === focus && !d.children) ||
+                                           (!focus.children && focus.parent === d.parent)) this.style.display = "inline"; })
+            .on("end", function(d) { if (d.parent !== focus &&
+                                         (d !== focus || d.children) &&
+                                         (focus.children || focus.parent !== d.parent)) this.style.display = "none"; });
 //            .on("end", function(d) { if (d.parent !== focus) this.style.display = "none"; });
     }
 
