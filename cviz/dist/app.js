@@ -74,12 +74,13 @@ d3.json("sample.json").then(data => {
     }
 
     function zoom(d) {
+        const zoomIn = d.parent === focus;
         focus = d;
         const fadedDepth = Math.max(0, d.depth) + 1
         const transition = svg.transition()
               .duration(d3.event.altKey ? 7500 : 750)
 
-        const opacityTransition = transition.ease(d3.easeLinear);
+        const opacityTransition = transition.ease(zoomIn ? d3.easeCubicOut : d3.easeCubicIn);
         
         const zoomTransition = transition
               .tween("zoom", d => {
