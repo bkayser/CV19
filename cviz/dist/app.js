@@ -21,7 +21,9 @@ d3.json("sample.json").then(data => {
 
     const hotspotColor = d3.scaleLinear()
           .domain([0, 0.1])
-          .range(["hsl(199,60%,50%)", "hsl(360,100%,40%)"])
+//          .range(["hsl(199,60%,50%)", "hsl(360,100%,40%)"])
+//          .range(["hsl(360,0%,50%)", "hsl(360,100%,40%)"])
+          .range(["hsl(94,34%,40%)", "hsl(360,100%,40%)"])
           .interpolate(d3.interpolateHcl)
 
     let focus = root;
