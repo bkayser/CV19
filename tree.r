@@ -33,9 +33,15 @@ concat <- function(df) {
                     split(division, fct_drop(division$State)) %>%
                       lapply(function(state){
                         paste0('{"name": "', state$State[1], '", "children": [\n',
-                               paste0('{"name": "', state$County, '", "value": ', state$Cases, '}', collapse=", "),
+                               paste0('{"name": "', state$County,
+                                      '","value": ', state$Cases, 
+                                      ',"growth": ', pmax(0,state$Cases.Growth5),
+                                      '}',
+                                      collapse=", "),
                                '\n]}')
                       }) %>% str_c(collapse=","),
                     ']}')}) %>% str_c(collapse=","),
          '\n]}\n')
 }
+
+write(concat(latest), "cviz/dist/sample.json")

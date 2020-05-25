@@ -1,4 +1,4 @@
-// d3 = require("d3@5")
+
 
 d3.json("sample.json").then(data => {
     const pack = data => d3.pack()
@@ -10,22 +10,29 @@ d3.json("sample.json").then(data => {
 
     const width = 932
     const height = width
+    const bgOpacity = 0.4   // Opacity of circles that are zoomed out
+    
     //format = d3.format(",d")
     const root = pack(data);
     const color = d3.scaleLinear()
-        .domain([0, root.height])
-//        .range(["hsl(152,80%,80%)", "hsl(228,30%,40%)"])
-        .range(["hsl(152,80%,80%)", "hsl(228,30%,70%)"])
-        .interpolate(d3.interpolateHcl)
+          .domain([0, root.height])
+          .range(["hsl(152,80%,80%)", "hsl(228,30%,70%)"])
+          .interpolate(d3.interpolateHcl)
+
+    const hotspotColor = d3.scaleLinear()
+          .domain([0, 0.1])
+          .range(["hsl(199,60%,50%)", "hsl(360,100%,40%)"])
+          .interpolate(d3.interpolateHcl)
 
     let focus = root;
     let view;
+    const fontSize = d3.scaleThreshold()
 
     const svg = d3.select("svg#top")
           .attr("viewBox", `-${width / 2} -${height / 2} ${width} ${height}`)
           .style("display", "block")
           .style("margin", "0 -14px")
-          .style("background", color(0))
+          .style("background", "white") //color(0))
           .style("cursor", "pointer")
           .on("click", () => zoom(root));
 
@@ -33,22 +40,22 @@ d3.json("sample.json").then(data => {
           .selectAll("circle")
           .data(root.descendants().slice(1))
           .join("circle")
-//          .attr("fill", d => d.children ? color(d.depth) : "white")
-          .attr("fill", d => d.children ? color(d.depth) : null)
+          .attr("fill", d => d.children ? color(d.depth) : hotspotColor(d.data.growth))
           .attr("class", d => d.children ? "parent" : "leaf")
-          .attr("pointer-events", d => d.children ? null : "none")
+          .attr("pointer-events", d => d.depth > 1 ? "none" : null)
+          .attr("fill-opacity", d => d.depth > 1 ? bgOpacity : 1)
           .on("mouseover", function(){ d3.select(this).attr("stroke", "#000"); })
           .on("mouseout", function(){ d3.select(this).attr("stroke", null); })
           .on("click", d => focus !== d && (zoom(d), d3.event.stopPropagation()));
 
     const label = svg.append("g")
           .attr("class", "label")
-//          .style("font", "10px sans-serif")
           .attr("pointer-events", "none")
           .attr("text-anchor", "middle")
           .selectAll("text")
           .data(root.descendants())
           .join("text")
+          .style("font-size", d => (d.parent ? d.r * width / d.parent.r : d.r * width) / 8)
           .style("fill-opacity", d => d.parent === root ? 1 : 0)
           .style("display", d => d.parent === root ? "inline" : "none")
           .text(d => d.data.name);
@@ -67,23 +74,39 @@ d3.json("sample.json").then(data => {
     }
 
     function zoom(d) {
-        const focus0 = focus;
-
         focus = d;
-
+        const fadedDepth = Math.max(0, d.depth) + 1
         const transition = svg.transition()
               .duration(d3.event.altKey ? 7500 : 750)
+
+        const opacityTransition = transition.ease(d3.easeLinear);
+        
+        const zoomTransition = transition
               .tween("zoom", d => {
                   const i = d3.interpolateZoom(view, [focus.x, focus.y, focus.r * 2]);
                   return t => zoomTo(i(t));
               });
 
+        node
+            .attr("pointer-events", d => d.depth > fadedDepth ? "none" : null)
+            .transition(opacityTransition)
+            .attr("fill-opacity", d => d.depth > fadedDepth ? bgOpacity : 1)
+        
         label
             .filter(function(d) { return d.parent === focus || this.style.display === "inline"; })
-            .transition(transition)
-            .style("fill-opacity", d => d.parent === focus ? 1 : 0)
-            .on("start", function(d) { if (d.parent === focus) this.style.display = "inline"; })
-            .on("end", function(d) { if (d.parent !== focus) this.style.display = "none"; });
+            .transition(zoomTransition)
+            .style("fill-opacity", d => d.parent === focus || (d === focus && !d.children) ? 1 : 0)
+            .style("font-size", d => {
+                if (focus.children) { 
+                    return (d.parent ? d.r * width / d.parent.r : d.r * width) / 8
+                } else {
+                    // zoomed down to the count y
+                    return `${Math.min(64, width/12)}px`;
+                }
+            })
+            .on("end", function(d) { if (d.parent === focus) this.style.display = "inline"; })
+            .on("start", function(d) { if (d.parent !== focus && (d !== focus || d.children)) this.style.display = "none"; });
+//            .on("end", function(d) { if (d.parent !== focus) this.style.display = "none"; });
     }
 
 });

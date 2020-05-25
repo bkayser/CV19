@@ -5,18 +5,18 @@ body {
 
 
 h1 {
-    font: 96px sans-serif;
+    font-family: sans-serif;
+    font-size: 36px;
     color: red;
 }
 
 circle.leaf {
-    fill: green;
-    fill-opacity: 0.1;
+#    fill: green;
 }
 
 .label text {
-    font: 16px sans-serif;
-    font-color: "red";
+    font-size: 24px;
+    font-family: sans-serif;
 }
 
 .node--hover circle {
