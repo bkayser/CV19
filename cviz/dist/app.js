@@ -1,5 +1,4 @@
 
-
 d3.json("sample.json").then(data => {
     const pack = data => d3.pack()
         .size([width, height])
@@ -21,8 +20,6 @@ d3.json("sample.json").then(data => {
 
     const hotspotColor = d3.scaleLinear()
           .domain([0, 0.1])
-//          .range(["hsl(199,60%,50%)", "hsl(360,100%,40%)"])
-//          .range(["hsl(360,0%,50%)", "hsl(360,100%,40%)"])
           .range(["hsl(94,34%,40%)", "hsl(360,100%,40%)"])
           .interpolate(d3.interpolateHcl)
 
@@ -52,8 +49,15 @@ d3.json("sample.json").then(data => {
           .attr("fill-opacity", d => d.depth > 1 ? bgOpacity : 1)
           .on("mouseover", function(d){
               d3.select(this).attr("stroke", "#000");
+              infoBar.node().textContent = `Cases: ${d.value}`
+              const pos = this.getBoundingClientRect()
+              infoBar.attr("x", pos.x + (pos.width/2) - width/2)
+              infoBar.attr("y", pos.y + Math.max(40, (pos.height*2/3)) - height/2)
           })
-          .on("mouseout", function(){ d3.select(this).attr("stroke", null); })
+          .on("mouseout", function(){
+              d3.select(this).attr("stroke", null);
+              infoBar.node().textContent = "";
+          })
           .on("click", d => { d3.event.stopPropagation(); focus === d ? zoom(d.parent) : zoom(d) })
           .on("dblclick", () => zoom(root))
 
@@ -70,6 +74,12 @@ d3.json("sample.json").then(data => {
           .style("fill-opacity", d => d.parent === root ? 1 : 0)
           .style("display", d => d.parent === root ? "inline" : "none")
           .text(d => d.data.name);
+
+    const infoBar = svg.append("text")
+          .attr("id", "infobar")
+          .attr("pointer-events", "none")
+              .attr("text-anchor", "middle")
+
 
 
     zoomTo([root.x, root.y, root.r * 2]);
