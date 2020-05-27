@@ -49,14 +49,11 @@ d3.json("sample.json").then(data => {
           .attr("fill-opacity", d => d.depth > 1 ? bgOpacity : 1)
           .on("mouseover", function(d){
               d3.select(this).attr("stroke", "#000");
-              infoBar.node().textContent = `Cases: ${d.value}`
-              const pos = this.getBoundingClientRect()
-              infoBar.attr("x", pos.x + (pos.width/2) - width/2)
-              infoBar.attr("y", pos.y + Math.max(40, (pos.height*2/3)) - height/2)
+              showInfo(d, this);
           })
           .on("mouseout", function(){
               d3.select(this).attr("stroke", null);
-              infoBar.node().textContent = "";
+              hideInfo();
           })
           .on("click", d => { d3.event.stopPropagation(); focus === d ? zoom(d.parent) : zoom(d) })
           .on("dblclick", () => zoom(root))
@@ -83,7 +80,25 @@ d3.json("sample.json").then(data => {
 
 
     zoomTo([root.x, root.y, root.r * 2]);
-         
+
+    function showInfo(node, circle) {
+        infoBar.node().textContent = `Cases: ${node.value}`;
+        const pos = circle.getBoundingClientRect();
+        //const pos = circle.getBBox();
+        
+        infoBar.attr("x", pos.x - width/2) // + pos.width/2)
+        infoBar.attr("y", pos.y - height/2) // + pos.height*0.6 )
+        //infoBar.node().transform = circle.transform;
+        
+        infoBar.attr("transform", `translate(${pos.x + pos.width/2 - width/2},${pos.y + pos.height*0.6 - height/2})`);
+        //infoBar.attr("x", pos.x + (pos.width/2) - width/2)
+        //infoBar.attr("y", pos.y + Math.max(40, (pos.height*0.50)) - height/2)
+        infoBar.style.display = "inline";
+    }
+    function hideInfo() {
+        infoBar.style.display = "none";
+    }
+    
     function zoomTo(v) {
         const k = width / v[2];
 
