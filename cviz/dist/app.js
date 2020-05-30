@@ -96,6 +96,7 @@ d3.csv("covid.csv").then(data => {
     function showInfo(node, circle) {
         infoBar.node().textContent = `Cases: ${node.value}`;
         const pos = circle.getBoundingClientRect();
+        
         infoBar.attr("x", pos.x + pos.width/2 - width/2) 
         infoBar.attr("y", pos.y + pos.height/2 + 30 - height/2)
         infoBar.style("display", "inline");
@@ -111,6 +112,7 @@ d3.csv("covid.csv").then(data => {
 
         label.attr("transform", d => `translate(${(d.x - v[0]) * k},${(d.y - v[1]) * k})`);
         circles.attr("transform", d => `translate(${(d.x - v[0]) * k},${(d.y - v[1]) * k})`);
+        
         circles.attr("r", d => d.r * k);
     }
 
