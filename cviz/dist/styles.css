@@ -14,10 +14,10 @@ circle.leaf {
 #    fill: green;
 }
 
-text#infobar {
+#infobar {
     font-size: 24px;
     font-family: sans-serif;
-    color: blue;
+    fill: #DD0F0F;
 }
 
 svg#top {
@@ -28,9 +28,19 @@ svg#top {
 .label text {
     font-size: 24px;
     font-family: sans-serif;
+    color: $333333;
 }
+.label text.highlighted {
+    fill: #DD0F0F;
+}
+
 
 .node--hover circle {
   stroke: #000;
   stroke-width: 1.2px;
+}
+
+div#date-slider {
+    width: 960px;
+    height: 100px;
 }

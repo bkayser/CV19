@@ -1,18 +1,24 @@
 
-d3.json("sample.json").then(data => {
-    const pack = data => d3.pack()
-        .size([width, height])
-        .padding(3)
-    (d3.hierarchy(data)
-     .sum(d => d.value)
-     .sort((a, b) => b.value - a.value))
-
-    const width = 932
+d3.csv("covid.csv").then(data => {
+    
+    const width = 960;
     const height = width
+
+    const hierarchy = d3.stratify()
+          .id(d => d.id)
+          .parentId(d => d.parent)(data)
+          .sum(d => +d.Cases)
+          .sort((a, b) => +b.Cases - +a.Cases)
+
+    const pack = d3.pack()
+          .size([width, height])
+          .padding(4)
+          .radius(d => Math.sqrt(d.value))
+
     const bgOpacity = 0.6   // Opacity of circles that are zoomed out
     
     //format = d3.format(",d")
-    const root = pack(data);
+    const root = pack(hierarchy);
     const color = d3.scaleLinear()
           .domain([0, root.height])
           .range(["hsl(152,80%,80%)", "hsl(228,30%,70%)"])
@@ -36,37 +42,45 @@ d3.json("sample.json").then(data => {
           .style("cursor", "pointer")
           .on("click", () => zoom(root));
 
-    const nodeContainer = svg.append("g")
-          .selectAll("g")
-          .data(root.descendants().slice(1))
-          .join("g")
+    const circlesContainer = svg.append("g");
 
-    const node = nodeContainer
-          .append("circle")
-          .attr("fill", d => d.children ? color(d.depth) : hotspotColor(d.data.growth))
+    const circles = circlesContainer
+          .selectAll("circle")
+          .data(root.descendants().slice(1))
+          .join("circle")
+          .attr("id", d => d.id)
+          .attr("fill", d => d.children ? color(d.depth) : hotspotColor(d.data.Growth))
           .attr("class", d => d.children ? "parent" : "leaf")
           .attr("pointer-events", d => d.depth > 1 ? "none" : null)
           .attr("fill-opacity", d => d.depth > 1 ? bgOpacity : 1)
           .on("mouseover", function(d){
+              // Inhibit info bar if focus has children and focus is the highlight request
+              // or if we are in the middle of zooming.
+              if (inZoom || (focus === d && d.children)) return;
+
               d3.select(this).attr("stroke", "#000");
+              d3.select(`text#${this.id}`).classed("highlighted", true);
               showInfo(d, this);
           })
           .on("mouseout", function(){
               d3.select(this).attr("stroke", null);
               hideInfo();
+              d3.select(`text#${this.id}`).classed("highlighted", false);
           })
-          .on("click", d => { d3.event.stopPropagation(); focus === d ? zoom(d.parent) : zoom(d) })
+          .on("click", d => {
+              hideInfo();
+              d3.event.stopPropagation(); focus === d ? zoom(d.parent) : zoom(d)
+          })
           .on("dblclick", () => zoom(root))
 
-    const labelContainer = svg.append("g")
+    const label = svg.append("g")
           .attr("class", "label")
           .attr("pointer-events", "none")
           .attr("text-anchor", "middle")
-
-    const label = labelContainer
           .selectAll("text")
           .data(root.descendants())
           .join("text")
+          .attr("id", d => d.id)
           .style("font-size", fontSize)
           .style("fill-opacity", d => d.parent === root ? 1 : 0)
           .style("display", d => d.parent === root ? "inline" : "none")
@@ -75,28 +89,19 @@ d3.json("sample.json").then(data => {
     const infoBar = svg.append("text")
           .attr("id", "infobar")
           .attr("pointer-events", "none")
-              .attr("text-anchor", "middle")
-
-
+          .attr("text-anchor", "middle")
 
     zoomTo([root.x, root.y, root.r * 2]);
 
     function showInfo(node, circle) {
         infoBar.node().textContent = `Cases: ${node.value}`;
         const pos = circle.getBoundingClientRect();
-        //const pos = circle.getBBox();
-        
-        infoBar.attr("x", pos.x - width/2) // + pos.width/2)
-        infoBar.attr("y", pos.y - height/2) // + pos.height*0.6 )
-        //infoBar.node().transform = circle.transform;
-        
-        infoBar.attr("transform", `translate(${pos.x + pos.width/2 - width/2},${pos.y + pos.height*0.6 - height/2})`);
-        //infoBar.attr("x", pos.x + (pos.width/2) - width/2)
-        //infoBar.attr("y", pos.y + Math.max(40, (pos.height*0.50)) - height/2)
-        infoBar.style.display = "inline";
+        infoBar.attr("x", pos.x + pos.width/2 - width/2) 
+        infoBar.attr("y", pos.y + pos.height/2 + 30 - height/2)
+        infoBar.style("display", "inline");
     }
     function hideInfo() {
-        infoBar.style.display = "none";
+        infoBar.style("display", "none");
     }
     
     function zoomTo(v) {
@@ -105,11 +110,15 @@ d3.json("sample.json").then(data => {
         view = v;
 
         label.attr("transform", d => `translate(${(d.x - v[0]) * k},${(d.y - v[1]) * k})`);
-        node.attr("transform", d => `translate(${(d.x - v[0]) * k},${(d.y - v[1]) * k})`);
-        node.attr("r", d => d.r * k);
+        circles.attr("transform", d => `translate(${(d.x - v[0]) * k},${(d.y - v[1]) * k})`);
+        circles.attr("r", d => d.r * k);
     }
 
+    // Track zooming state so we inhibit highlighting during zooms
+    let inZoom = false;
+    
     function zoom(d) {
+        inZoom = true;
         const zoomIn = d.parent === focus;
         focus = d;
         const fadedDepth = Math.max(0, d.depth) + 1
@@ -124,7 +133,7 @@ d3.json("sample.json").then(data => {
                   return t => zoomTo(i(t));
               });
 
-        node
+        circles
             .attr("pointer-events", d => d.depth > fadedDepth ? "none" : null)
             .transition(opacityTransition)
             .attr("fill-opacity", d => d.depth > fadedDepth ? bgOpacity : 1)
@@ -141,13 +150,18 @@ d3.json("sample.json").then(data => {
                     return fontSize(d);
                 }
             })
-            .on("start", function(d) { if (d.parent === focus ||
-                                           (d === focus && !d.children) ||
-                                           (!focus.children && focus.parent === d.parent)) this.style.display = "inline"; })
-            .on("end", function(d) { if (d.parent !== focus &&
-                                         (d !== focus || d.children) &&
-                                         (focus.children || focus.parent !== d.parent)) this.style.display = "none"; });
-//            .on("end", function(d) { if (d.parent !== focus) this.style.display = "none"; });
+            .on("start", function(d) {
+                if (d.parent === focus ||
+                    (d === focus && !d.children) ||
+                    (!focus.children && focus.parent === d.parent)) this.style.display = "inline";
+            })
+            .on("end", function(d) {
+                inZoom = false;
+                if (d.parent !== focus &&
+                    (d !== focus || d.children) &&
+                    (focus.children || focus.parent !== d.parent)) this.style.display = "none";
+                showInfo(focus, svg.select(`circle#${focus.id}`).node());
+            });
     }
 
 });
