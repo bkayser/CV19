@@ -1,16 +1,17 @@
 
+function setupSlider(data, onchange) {
 const container = d3.select("div#date-slider");
 const width = container.node().getBoundingClientRect().width - 60;
 
 
 var gTime = container
     .append('svg')
-    .attr('width',width)
+    .attr('width', width)
     .attr('height', 100)
     .append('g')
     .attr('transform', 'translate(30,30)');
 
-function setupSlider(data, onchange) {
+
     const dateParser = d3.timeParse("%Y-%m-%d");
     
     const dates = Object.keys(data[0])
@@ -21,7 +22,7 @@ function setupSlider(data, onchange) {
     const start = dates[0];
     const finish = dates[dates.length - 1];
 
-
+    
     var sliderTime = d3
         .sliderBottom()
         .min(start) //d3.min(dayRange))
@@ -30,9 +31,8 @@ function setupSlider(data, onchange) {
         .width(width - 60)
         .tickFormat(d3.timeFormat('%b %e'))
         .default(finish)
-        .on('onchange', val => {
-            onchange(val);
-           });
+//        .on('onchange', onchange)
+        .on('onchange', _.throttle(onchange, 200, { leading: true, trailing: false }));
     gTime.call(sliderTime);
 }
 

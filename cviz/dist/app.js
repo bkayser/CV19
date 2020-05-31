@@ -1,14 +1,14 @@
 
 d3.csv("covid.csv").then(data => {
     
+    let valueColumnName = "Cases";
     const width = 960;
     const height = width
 
     const hierarchy = d3.stratify()
           .id(d => d.id)
-          .parentId(d => d.parent)(data)
-          .sum(d => +d.Cases)
-          .sort((a, b) => +b.Cases - +a.Cases)
+          .parentId(d => d.parent)(data);
+    
 
     const pack = d3.pack()
           .size([width, height])
@@ -18,7 +18,10 @@ d3.csv("covid.csv").then(data => {
     const bgOpacity = 0.6   // Opacity of circles that are zoomed out
     
     format = d3.format(",d")
-    const root = pack(hierarchy);
+    const root = pack(hierarchy
+                      .sum(d => +d[valueColumnName])
+                      .sort((a, b) => +b[valueColumnName] - +a[valueColumnName]));
+
     const color = d3.scaleLinear()
           .domain([0, root.height])
           .range(["hsl(152,80%,80%)", "hsl(228,30%,70%)"])
@@ -44,57 +47,72 @@ d3.csv("covid.csv").then(data => {
 
     const circlesContainer = svg.append("g");
 
-    const circles = circlesContainer
-          .selectAll("circle")
-          .data(root.descendants().slice(1))
-          .join("circle")
-          .attr("id", d => d.id)
-          .attr("fill", d => d.children ? color(d.depth) : hotspotColor(d.data.Growth))
-          .attr("class", d => d.children ? "parent" : "leaf")
-          .attr("pointer-events", d => d.depth > 1 ? "none" : null)
-          .attr("fill-opacity", d => d.depth > 1 ? bgOpacity : 1)
-          .on("mouseover", function(d){
-              // Inhibit info bar if focus has children and focus is the highlight request
-              // or if we are in the middle of zooming.
-              if (inZoom || (focus === d && d.children)) return;
+    const circles = drawCircles();
+    function drawCircles() {
+        return circlesContainer
+            .selectAll("circle")
+            .data(root.descendants().slice(1))
+            .join(enter => enter
+                  .append("circle")
+                  .attr("id", d => d.id)
+                  .attr("class", d => d.children ? "parent" : "leaf")
+                  .attr("fill-opacity", d => d.depth > 1 ? bgOpacity : 1)
+                  .attr("pointer-events", d => d.depth > 1 ? "none" : null)
+                  .on("mouseover", function(d){
+                      // Inhibit info bar if focus has children and focus is the highlight request
+                      // or if we are in the middle of zooming.
+                      if (inZoom || (focus === d && d.children)) return;
 
-              d3.select(this).attr("stroke", "#000");
-              d3.select(`text#${this.id}`).classed("highlighted", true);
-              showInfo(d, this);
-          })
-          .on("mouseout", function(){
-              d3.select(this).attr("stroke", null);
-              hideInfo();
-              d3.select(`text#${this.id}`).classed("highlighted", false);
-          })
-          .on("click", d => {
-              hideInfo();
-              d3.event.stopPropagation(); focus === d ? zoom(d.parent) : zoom(d)
-          })
-          .on("dblclick", () => zoom(root))
+                      d3.select(this).attr("stroke", "#000");
+                      d3.select(`text#${this.id}`).classed("highlighted", true);
+                      showInfo(d, this);
+                  })
+                  .on("mouseout", function(){
+                      d3.select(this).attr("stroke", null);
+                      hideInfo();
+                      d3.select(`text#${this.id}`).classed("highlighted", false);
+                  })
+                  .on("click", d => {
+                      hideInfo();
+                      d3.event.stopPropagation(); focus === d ? zoom(d.parent) : zoom(d)
+                  })
+                  .on("dblclick", () => zoom(root)))
+            .attr("fill", d => d.children ? color(d.depth) : hotspotColor(d.data.Growth))
+        
+    }
 
-    const label = svg.append("g")
+    const labelsContainer = 
+        svg.append("g")
           .attr("class", "label")
           .attr("pointer-events", "none")
-          .attr("text-anchor", "middle")
+
+    const label = drawLabels();
+    
+    function drawLabels() {
+        return labelsContainer
           .selectAll("text")
           .data(root.descendants())
-          .join("text")
-          .attr("id", d => d.id)
-          .style("font-size", fontSize)
-          .style("fill-opacity", d => d.parent === root ? 1 : 0)
-          .style("display", d => d.parent === root ? "inline" : "none")
-          .text(d => d.data.name);
+            .join(enter => enter
+                  .append("text")
+                  .attr("id", d => d.id)
+                  .attr("text-anchor", "middle")
+                  .style("font-size", fontSize)
+                  .style("fill-opacity", d => d.parent === root ? 1 : 0)
+                  .style("display", d => d.parent === root ? "inline" : "none"))
+            .text(d => d.data.name)
+    }
 
     const infoBar = svg.append("text")
           .attr("id", "infobar")
           .attr("pointer-events", "none")
           .attr("text-anchor", "middle")
 
+    // Sets the transforms for the initial setup.
     zoomTo([root.x, root.y, root.r * 2]);
 
     const parentOffset = svg.node().getBoundingClientRect();
     function showInfo(node, circle) {
+        if (!circle) return;
         infoBar.node().textContent = `Cases: ${format(node.value)}`;
         const pos = circle.getBoundingClientRect();
         infoBar.attr("x", pos.x + pos.width/2 - width/2 - parentOffset.x) 
@@ -109,7 +127,6 @@ d3.csv("covid.csv").then(data => {
         const k = width / v[2];
 
         view = v;
-
         label.attr("transform", d => `translate(${(d.x - v[0]) * k},${(d.y - v[1]) * k})`);
         circles.attr("transform", d => `translate(${(d.x - v[0]) * k},${(d.y - v[1]) * k})`);
         
@@ -166,15 +183,20 @@ d3.csv("covid.csv").then(data => {
             });
     }
 
-    let valueColumnName;
 
     const dateColFormat = d3.timeFormat("%Y-%m-%d");
 
     setupSlider(data, d => {
-        valueColumnName = dateColFormat(d);
-        d3.select('#value-time').text(focus.data[`Cases_${valueColumnName}`]);
+        console.log(`Slider: ${d}`);
+        valueColumnName = `Cases_${dateColFormat(d)}`;
+        pack(hierarchy
+             .sum(d => +d[valueColumnName])
+             .sort((a, b) => +b[valueColumnName] - +a[valueColumnName]));
+        d3.select('#value-time')
+            .text(+focus.value);
+        zoom(focus)
         circles
-            .attr("fill", d => d.children ? color(d.depth) : hotspotColor(d.data[`Growth_${valueColumnName}`]))
+            .attr("fill", d => d.children ? color(d.depth) : hotspotColor(d.data[`Growth_${dateColFormat(d)}`]))
     });
     
 });
