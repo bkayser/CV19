@@ -17,7 +17,7 @@ d3.csv("covid.csv").then(data => {
 
     const bgOpacity = 0.6   // Opacity of circles that are zoomed out
     
-    //format = d3.format(",d")
+    format = d3.format(",d")
     const root = pack(hierarchy);
     const color = d3.scaleLinear()
           .domain([0, root.height])
@@ -37,7 +37,7 @@ d3.csv("covid.csv").then(data => {
     const svg = d3.select("svg#top")
           .attr("viewBox", `-${width / 2} -${height / 2} ${width} ${height}`)
           .style("display", "block")
-          .style("margin", "0 -14px")
+          .style("margin", "0 0px")
           .style("background", "white") //color(0))
           .style("cursor", "pointer")
           .on("click", () => zoom(root));
@@ -93,12 +93,12 @@ d3.csv("covid.csv").then(data => {
 
     zoomTo([root.x, root.y, root.r * 2]);
 
+    const parentOffset = svg.node().getBoundingClientRect();
     function showInfo(node, circle) {
-        infoBar.node().textContent = `Cases: ${node.value}`;
+        infoBar.node().textContent = `Cases: ${format(node.value)}`;
         const pos = circle.getBoundingClientRect();
-        
-        infoBar.attr("x", pos.x + pos.width/2 - width/2) 
-        infoBar.attr("y", pos.y + pos.height/2 + 30 - height/2)
+        infoBar.attr("x", pos.x + pos.width/2 - width/2 - parentOffset.x) 
+        infoBar.attr("y", pos.y + pos.height/2 + 30 - height/2 - parentOffset.y)
         infoBar.style("display", "inline");
     }
     function hideInfo() {
@@ -166,6 +166,17 @@ d3.csv("covid.csv").then(data => {
             });
     }
 
+    let valueColumnName;
+
+    const dateColFormat = d3.timeFormat("%Y-%m-%d");
+
+    setupSlider(data, d => {
+        valueColumnName = dateColFormat(d);
+        d3.select('#value-time').text(focus.data[`Cases_${valueColumnName}`]);
+        circles
+            .attr("fill", d => d.children ? color(d.depth) : hotspotColor(d.data[`Growth_${valueColumnName}`]))
+    });
+    
 });
 
 

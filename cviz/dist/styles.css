@@ -17,7 +17,7 @@ circle.leaf {
 #infobar {
     font-size: 24px;
     font-family: sans-serif;
-    fill: #DD0F0F;
+    fill: #AA0F0F;
 }
 
 svg#top {
@@ -30,10 +30,14 @@ svg#top {
     font-family: sans-serif;
     color: $333333;
 }
+
 .label text.highlighted {
-    fill: #DD0F0F;
+    fill: #AA0F0F;
 }
 
+div {
+    position: relative;
+}
 
 .node--hover circle {
   stroke: #000;
