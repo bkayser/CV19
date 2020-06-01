@@ -66,8 +66,9 @@ cvdata.us %>%
   filter(!is.na(Division) & Date == end_date & Population > 5000) %>%
   arrange(desc(Cases.Per100K)) %>%
   mutate(Label=paste0(County,", ", State.Code)) %>%
-  select(Label, Cases.Per100K, Deaths.Per100K) %>%
-  top_n(25) %>% knitr::kable(col.names=c('County', 'Cases Per 100K', 'Deaths Per 100K'))
+  select(Label, Cases.Per100K, Deaths.Per100K, Deaths) %>%
+  top_n(25) %>% knitr::kable(col.names=c('County', 'Cases Per 100K', 'Deaths Per 100K', 'Total Deaths'))
+
 ```
 
 
