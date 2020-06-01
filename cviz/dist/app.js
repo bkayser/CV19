@@ -2,6 +2,9 @@
 d3.csv("covid.csv").then(data => {
     
     let valueColumnName = "Cases";
+    let view;
+
+    const format = d3.format(",d")
     const width = 960;
     const height = width
 
@@ -17,10 +20,11 @@ d3.csv("covid.csv").then(data => {
 
     const bgOpacity = 0.6   // Opacity of circles that are zoomed out
     
-    format = d3.format(",d")
     const root = pack(hierarchy
                       .sum(d => +d[valueColumnName])
                       .sort((a, b) => +b[valueColumnName] - +a[valueColumnName]));
+
+    let focus = root;
 
     const color = d3.scaleLinear()
           .domain([0, root.height])
@@ -33,8 +37,7 @@ d3.csv("covid.csv").then(data => {
           .interpolate(d3.interpolateHcl)
 
 
-    let focus = root;
-    let view;
+    
     const fontSize = d => `${ (d.parent ? d.r * width / d.parent.r : d.r * width) / 6 }px`;
 
     const svg = d3.select("svg#top")
@@ -47,7 +50,62 @@ d3.csv("covid.csv").then(data => {
 
     const circlesContainer = svg.append("g");
 
+    const labelsContainer = 
+        svg.append("g")
+          .attr("class", "label")
+          .attr("pointer-events", "none")
+
     const circles = drawCircles();
+    const label = drawLabels();
+    
+    const infoBar = svg.append("text")
+          .attr("id", "infobar")
+          .attr("pointer-events", "none")
+          .attr("text-anchor", "middle")
+
+    // Sets the transforms for the initial setup.
+    zoomTo([root.x, root.y, root.r * 2]);
+
+    const dateColFormat = d3.timeFormat("%Y-%m-%d");
+
+    setupSlider(data, d => {
+        console.log(`Slider: ${d}`);
+        valueColumnName = `Cases_${dateColFormat(d)}`;
+        pack(hierarchy
+             .sum(d => +d[valueColumnName])
+             .sort((a, b) => +b[valueColumnName] - +a[valueColumnName]));
+        d3.select('#value-time')
+            .text(+focus.value);
+        drawCircles();
+        drawLabels();
+        zoom(focus);
+    });
+
+
+    function showInfo(node, circle) {
+        const parentOffset = svg.node().getBoundingClientRect();
+
+        if (!circle) return;
+        infoBar.node().textContent = `Cases: ${format(node.value)}`;
+        const pos = circle.getBoundingClientRect();
+        infoBar.attr("x", pos.x + pos.width/2 - width/2 - parentOffset.x) 
+        infoBar.attr("y", pos.y + pos.height/2 + 30 - height/2 - parentOffset.y)
+        infoBar.style("display", "inline");
+    }
+    function hideInfo() {
+        infoBar.style("display", "none");
+    }
+    
+    function zoomTo(v) {
+        const k = width / v[2];
+
+        view = v;
+        label.attr("transform", d => `translate(${(d.x - v[0]) * k},${(d.y - v[1]) * k})`);
+        circles.attr("transform", d => `translate(${(d.x - v[0]) * k},${(d.y - v[1]) * k})`);
+        
+        circles.attr("r", d => d.r * k);
+    }
+
     function drawCircles() {
         return circlesContainer
             .selectAll("circle")
@@ -81,13 +139,6 @@ d3.csv("covid.csv").then(data => {
         
     }
 
-    const labelsContainer = 
-        svg.append("g")
-          .attr("class", "label")
-          .attr("pointer-events", "none")
-
-    const label = drawLabels();
-    
     function drawLabels() {
         return labelsContainer
           .selectAll("text")
@@ -100,37 +151,6 @@ d3.csv("covid.csv").then(data => {
                   .style("fill-opacity", d => d.parent === root ? 1 : 0)
                   .style("display", d => d.parent === root ? "inline" : "none"))
             .text(d => d.data.name)
-    }
-
-    const infoBar = svg.append("text")
-          .attr("id", "infobar")
-          .attr("pointer-events", "none")
-          .attr("text-anchor", "middle")
-
-    // Sets the transforms for the initial setup.
-    zoomTo([root.x, root.y, root.r * 2]);
-
-    const parentOffset = svg.node().getBoundingClientRect();
-    function showInfo(node, circle) {
-        if (!circle) return;
-        infoBar.node().textContent = `Cases: ${format(node.value)}`;
-        const pos = circle.getBoundingClientRect();
-        infoBar.attr("x", pos.x + pos.width/2 - width/2 - parentOffset.x) 
-        infoBar.attr("y", pos.y + pos.height/2 + 30 - height/2 - parentOffset.y)
-        infoBar.style("display", "inline");
-    }
-    function hideInfo() {
-        infoBar.style("display", "none");
-    }
-    
-    function zoomTo(v) {
-        const k = width / v[2];
-
-        view = v;
-        label.attr("transform", d => `translate(${(d.x - v[0]) * k},${(d.y - v[1]) * k})`);
-        circles.attr("transform", d => `translate(${(d.x - v[0]) * k},${(d.y - v[1]) * k})`);
-        
-        circles.attr("r", d => d.r * k);
     }
 
     // Track zooming state so we inhibit highlighting during zooms
@@ -184,20 +204,6 @@ d3.csv("covid.csv").then(data => {
     }
 
 
-    const dateColFormat = d3.timeFormat("%Y-%m-%d");
-
-    setupSlider(data, d => {
-        console.log(`Slider: ${d}`);
-        valueColumnName = `Cases_${dateColFormat(d)}`;
-        pack(hierarchy
-             .sum(d => +d[valueColumnName])
-             .sort((a, b) => +b[valueColumnName] - +a[valueColumnName]));
-        d3.select('#value-time')
-            .text(+focus.value);
-        zoom(focus)
-        circles
-            .attr("fill", d => d.children ? color(d.depth) : hotspotColor(d.data[`Growth_${dateColFormat(d)}`]))
-    });
     
 });
 
