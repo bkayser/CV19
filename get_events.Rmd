@@ -1,5 +1,5 @@
 ---
-title: "Read MSL Games"
+title: "Scrape State Orders"
 output:
   html_notebook: default
   html_document: default
@@ -89,11 +89,14 @@ detailed.events <- lapply(states, function(state){
   }
   tibble(name=name, gov.name=gov.name, gov.party=gov.party, status=status, still_open = open.detail, still_closed = closed.detail)
   
-  
 }) %>% bind_rows()
 
-    
-    
-    
-    
+```
+
+Save the data.
+
+```{r}
+saveRDS(graph.events, "data/orders.events.RDS")
+saveRDS(detailed.events, "data/states.status.RDS")
+
 ```
