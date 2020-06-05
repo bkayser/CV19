@@ -1,0 +1,8 @@
+rmarkdown::render('CleanData.Rmd')
+system("open CleanData.nb.html")
+rmarkdown::render('States.Rmd')
+system("open States.nb.html")
+rmarkdown::render('International.Rmd')
+system("open International.nb.html")
+rmarkdown::render('Predict.Rmd')
+system("open Predict.nb.html")
