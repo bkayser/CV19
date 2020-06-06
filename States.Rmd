@@ -43,6 +43,8 @@ library(ggthemes)
 ```{r echo=T}
 cvdata.us <- readRDS('data/cvdata.us.RDS')
 cvdata.us.by_state <- readRDS('data/cvdata.us.by_state.RDS')
+state.orders <- readRDS('data/orders.events.RDS')
+
 
 # Let's first set up some parameters for the graph's X axis.
 
@@ -85,25 +87,26 @@ cvdata.us %>%
 
 ### Hotspots
 
-```{r fig.height=5, fig.width=4}
+```{r fig.height=4, fig.width=5}
 hotspots <- cvdata.us %>%
   mutate(Label=paste0(County,", ", State.Code)) %>%
-  filter(!is.na(Division) & Date == end_date & Population > 1000 & Cases > 50) %>%
-  arrange(desc(Cases.Growth5)) %>%
-  head(50) 
+  filter(!is.na(Division) & Date == end_date & Population > 1000 & Cases.Diff5 >= 25) %>%
+  arrange(desc(Cases.Growth5)) 
 
-ggplot(hotspots) +
-  aes(x=reorder(Label, Cases.Growth5), y=Cases.Growth5, fill=State.Code) +
-  geom_col(show.legend=F) +
+ggplot(head(hotspots, 25)) +
+  aes(x=reorder(Label, Cases.Growth5), fill = gov.party, label=round(Cases.Diff5), y=Cases.Growth5) +
+  geom_col(show.legend=T) +
+  scale_fill_manual(values = c('D' = '#6666FF', 'R'='#FF6666')) +
   scale_y_continuous(position = 'right') +
   geom_text(aes(label=percent(Cases.Growth5)), size=4, nudge_y=0.01) +
   coord_flip() + 
   ylab('Average Growth 5 Day Moving Average') +
   xlab(NULL) +
+  geom_text(y=0.003, color='white', hjust='inward') +
   theme(line = element_blank(), 
         panel.border = element_blank(),
         axis.text.x = element_blank(),
-        legend.position=c(0.5,0.5))
+        legend.position=c(0.8,0.5))
 
 ```
 
@@ -119,15 +122,33 @@ cvdata.us %>%
   xlab(NULL) +
   theme(legend.title=element_blank())
 
-rm(hotspots)  
+
 ```
 
+### Comparing Red States and Blue States
+
+Breaking down states' data according to the party of the governor.
+
+```{r}
+cvdata.us %>%
+  filter(Date == end_date & !is.na(gov.party)) %>%
+  group_by(gov.party) %>%
+  summarize( Count = n(),
+             Cases.Diff5 = sum(Cases.Diff5),
+             Cases.Per.County = round(sum(Cases) / n()),
+             Growth = percent(signif(sum(Cases.Diff5) / sum(Cases), 2)),
+             Cases = comma(signif(sum(Cases),3))) %>%
+  select(gov.party, Count, Cases, Cases.Per.County, Growth) %>%
+  knitr::kable(col.names = c("Governor's Party", "Number of Counties", "Total Cases to Date", "Cases per County", "Current 5 Day Growth"))
+
+rm(hotspots)  
+```
 
 ## Confirmed Case History in Top 10 States
 
 ```{r echo=F}
 cvdata.us.current <- filter(cvdata.us.by_state, Date == end_date)
-Cases.top.10 <- arrange(cvdata.us.current, desc(Cases)) %>% head(10) %>% pull(State) %>% droplevels() 
+Cases.top.10 <- arrange(cvdata.us.current, desc(Cases)) %>% head(10) %>% pull(State) 
 
 g <- cvdata.us.by_state %>%
   filter(State %in% Cases.top.10) %>%
@@ -150,7 +171,7 @@ g + scale_y_log10(labels=comma) + labs(subtitle="Log Scale")
 ## Deaths in Top 10 States
 
 ```{r echo=F}
-Deaths.top.10 <- arrange(cvdata.us.current, desc(Deaths)) %>% head(10) %>% pull(State) %>% droplevels() 
+Deaths.top.10 <- arrange(cvdata.us.current, desc(Deaths)) %>% head(10) %>% pull(State) 
 
 g <- cvdata.us.by_state %>%
   filter(State %in% Deaths.top.10) %>%
@@ -245,6 +266,7 @@ cvdata.us.by_state %>%
 ```{r echo=F, fig.height=4, fig.width=5}
 cvdata.ga <- filter(cvdata.us.by_state, State.Code == 'GA')
 
+
 g <- ggplot(cvdata.ga) +
   aes(Date, Cases.Diff5) +
   geom_line(color='blue') + 
@@ -262,38 +284,69 @@ g
 
 ```
 
+## State Summary
+
+
+```{r echo=F, fig.height=3.5, fig.width=4}
+
+
+state.summary.g <- function(state.code='OR', overlay='Deaths') {
+  state.data <- filter(cvdata.us.by_state, State.Code == state.code) %>%
+    mutate(Daily.Increase=round(Cases.Diff5))
+  name <- state.data$State[1]
+  orders <- filter(state.orders, state==name)
+  last.recorded.value <- tail(state.data, 1) %>% pull(overlay)
+  # scale the overlay so it fits in the graph
+  scale.factor <- max(state.data$Cases.Diff5) / last.recorded.value
+  state.data$Overlay <- unlist(state.data[overlay]) * scale.factor
+  
+  ggplot(state.data) +
+    aes(x=Date, y=Cases.Diff5) +
+    geom_line(color='blue') + 
+    geom_text(aes(label=Daily.Increase), 
+              nudge_y=4,
+              check_overlap=T,
+              color='black') +
+    geom_smooth(alpha=0.05, method='loess', color='blue', fill='blue', fullrange=T, span=0.5, size=0.5, linetype=3) +
+    ggtitle(paste(name, 'Change in Confirmed Cases, Five Day Average'),
+            subtitle = str_c("Reported data through ", format(max(cvdata.us$Date), "%B %d, %Y"))) +
+    ylab("Daily Increase") +
+    geom_text(data=~ tail(.x, 1), 
+              aes(label=paste0(overlay, ': ',comma(last.recorded.value))),
+              y=last.recorded.value * scale.factor,
+              color='red',
+              size=4,
+              nudge_y=0.1 * last.recorded.value * scale.factor,
+              nudge_x=-12,
+              show.legend = F) +
+    geom_vline(data=orders,
+               aes(xintercept=date, color=type),
+               alpha=0.5,
+               size=1) +
+    scale_color_manual(values=c(close='#33FF33', open='#FF9999')) +
+    geom_text(data=orders,
+              aes(x=date,y=-0.04*last.recorded.value*scale.factor,
+                  label=paste(Hmisc::capitalize(type),format(date, '%b %d'))),
+              hjust='left',
+              nudge_x=1) +
+    xlab(NULL)  +
+    labs(color='State Orders') +
+    scale_y_continuous(name='Daily Increase', sec.axis = sec_axis(trans = ~./scale.factor, name = overlay)) +
+    geom_line(aes(y=Overlay), color='red') +
+    coord_cartesian(xlim=c(ymd('2020-03-15'), end_date)) +
+    scale_x_date(breaks=date.breaks, date_labels = '%m/%d', date_minor_breaks='1 day') +
+    theme_stata() 
+}
+state.summary.g('NJ')
+state.summary.g('NY')
+state.summary.g('TX')
+```
+
 ## Oregon
 
 
 ```{r echo=F, fig.height=3.5, fig.width=4}
-cvdata.or <- filter(cvdata.us.by_state, State.Code == 'OR') %>%
-  mutate(Daily.Increase=round(Cases.Diff5)) 
-ggplot(cvdata.or) +
-  aes(x=Date, y=Cases.Diff5) +
-  geom_line(color='blue') + 
-  geom_text(aes(label=Daily.Increase), 
-            #position=position_dodge(8),
-            nudge_y=4,
-            check_overlap=T,
-            color='black') +
-  #geom_smooth(alpha=0.1, method='lm', color='blue', fill='blue', formula= y ~ poly(x,4), fullrange=T, span=0.2, size=0.5, linetype=3) +
-  geom_smooth(alpha=0.05, method='loess', color='blue', fill='blue', fullrange=T, span=0.5, size=0.5, linetype=3) +
-  ggtitle('Oregon Change in Confirmed Cases, Five Day Average',
-          subtitle = str_c("Reported data through ", format(max(cvdata.us$Date), "%B %d, %Y"))) +
-  ylab("Daily Increase") +
-  geom_text(data=~ tail(.x, 1), aes(y=Deaths, label=paste0('Total Deaths: ',Deaths)), 
-            #position='dodge', 
-            color='red', 
-            size=6, 
-            nudge_y=-5, 
-            nudge_x=-12, 
-            show.legend = T) +
-  xlab(NULL)  +
-  geom_line(aes(y=Deaths), color='red') +
-  coord_cartesian(xlim=c(ymd('2020-03-15'), end_date)) +
-  scale_x_date(breaks=date.breaks, date_labels = '%m/%d', date_minor_breaks='1 day') +
-  theme_stata()
-
+state.summary.g('OR', 'Cases')
 ```
 
 
@@ -457,7 +510,7 @@ testdata <- testdata.ts %>%
 
 
 ggplot(testdata) +
-  aes(x=State.Code, y=Tests.Per.Capita, fill=Region) +
+  aes(x=State.Code, y=Tests.Per.Capita, fill=gov.party) +
   geom_bar(stat='identity') +
   scale_y_continuous(labels=comma, position='right') +
   ggtitle('Tests conducted per 100K population') +
@@ -466,7 +519,7 @@ ggplot(testdata) +
 testdata$State = fct_reorder(testdata$State, testdata$Test.Positive.Rate)
 
 ggplot(testdata) +
-  aes(x=State, y=Test.Positive.Rate, fill=Region) +
+  aes(x=State, y=Test.Positive.Rate, fill=gov.party) +
   geom_bar(stat='identity') +
   scale_y_continuous(labels=percent, position='right') +
   coord_flip(ylim=c(0,0.55))  +
