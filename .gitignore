@@ -42,4 +42,4 @@ vignettes/*.pdf
 
 rsconnect/
 /wapo.html
-/wapo_map_files
+/*_files

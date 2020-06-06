@@ -142,8 +142,7 @@ cvdata.us <- left_join(cases,
   rename(Cases = Count.x,
          Deaths = Count.y) %>%
   left_join(counties, by='FIPS') %>% 
-  left_join(states.summary, by=c('State'='name')) %>%
-  left_join(read.csv('data/state_abbrev.csv') %>% select(State, State.Code=Code), by='State') %>% # Join State abbreviations
+  left_join(states.summary, by=c('State')) %>%
   filter(!is.na(Region)) %>%
   mutate(State = as.factor(State), 
          County = as.factor(County)) %>%
@@ -200,7 +199,7 @@ cvdata.us.by_state <- cvdata.us %>%
          Infection.Rate = Cases.Diff * 1000000 / Population,
          Death.Rate = Deaths.Diff * 1000000 / Population) %>%
   add_estimated_recoveries() %>%
-  left_join(states.summary, by=c('State'='name')) %>%
+  left_join(states.summary, by=c('State', 'State.Code')) %>%
   select(Key, State, State.Code, Region, Division, Date, starts_with('Cases'), starts_with('Deaths'), contains('Recovered'), matches('^[A-Z]', ignore.case=F), -FIPS, everything())
 rm(states)
 

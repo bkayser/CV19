@@ -61,7 +61,7 @@ graph.events <-
       desc <- html_text(trim=T, html_nodes(order, "text.order-label"))
 #      desc <- lapply(html_nodes(order, "text.order-label tspan"),
 #                     function(line) { html_text(line) }) %>% paste(collapse=' ')
-      tibble(state=name, type=type, date=date, desc=desc)
+      tibble(State=name, type=type, date=date, desc=desc)
     }) %>% bind_rows()
   }) %>% bind_rows() %>%
   # Cleanup the text
@@ -87,7 +87,7 @@ detailed.events <- lapply(states, function(state){
       open.detail <- html_text(item)
     }
   }
-  tibble(name=name, gov.name=gov.name, gov.party=gov.party, status=status, still_open = open.detail, still_closed = closed.detail)
+  tibble(State=name, gov.name=gov.name, gov.party=gov.party, status=status, still_open = open.detail, still_closed = closed.detail)
   
 }) %>% bind_rows()
 
@@ -96,7 +96,8 @@ detailed.events <- lapply(states, function(state){
 Save the data.
 
 ```{r}
-saveRDS(graph.events, "data/orders.events.RDS")
-saveRDS(detailed.events, "data/states.status.RDS")
-
+abbrevs <- read.csv('data/state_abbrev.csv', stringsAsFactors = F) %>% select(State, State.Code=Code)
+saveRDS(left_join(graph.events, abbrevs), "data/orders.events.RDS")
+saveRDS(left_join(detailed.events, abbrevs), "data/states.status.RDS")
+rm(abbrevs, detailed.events, graph.events, states)
 ```
