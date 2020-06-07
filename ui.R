@@ -13,37 +13,36 @@ shinyUI(fluidPage(
   
     # Application title
     titlePanel("Exploring COVID-19 Data"),
-    
-    sidebarLayout(
-        sidebarPanel(
-          helpText("Select the content to display, either Confirmed Cases, or Deaths."),
-          radioButtons('content', NULL, c('Cases', 'Deaths'), 'Cases', inline=T),
-          helpText("To change the selected states, edit the field and delete states, or add new ones from the drop down list."),
-          selectInput('states', 'States', states, 
-                      selected = c('New York', 'Oregon', 'Indiana', 'California', 'Washington', 'Arizona'),
-                      multiple = TRUE,
-                      selectize = TRUE, width = NULL),
-          helpText("Select the scale for the Y axis.  Log Scale can make it easier to compare states, but can be misleading about the magnitude.  Choose normal to see an accurate perspective."),
-          radioButtons('scale', 'Scale', c('log','normal'), 'log', inline = T),
-          # sliderInput("beta",
-            #             "Infection Rate:",
-            #             min = 0.02,
-            #             max = 0.62,
-            #             value = 0.2),
-            # sliderInput("gamma",
-            #             "Recovery Rate:",
-            #             min = 0.1,
-            #             max = 1.0,
-            #             value = 0.5),
-
-            #h2('Instructions'),
-          
-          
-          ),
-        
-        # Show a plot of the generated distribution
-        mainPanel(
-            plotOutput("charts", width="100%", height="500px")
-        )
+    tabsetPanel(
+      tabPanel("State Growth Detail", 
+               sidebarLayout(
+                 sidebarPanel(
+                   helpText("Select the state to display:"),
+                   selectInput('state', 'State', states, 
+                               selected = 'Oregon',
+                               multiple = FALSE,
+                               selectize = F, width = NULL),
+                   helpText("Select the data to overlay:"),
+                   radioButtons('overlay', 'Overlay', c('Cases','Deaths'), 'Cases', inline = T)
+                 ),
+                 # Show a plot of the generated distribution
+                 mainPanel(plotOutput("detail_charts", width="100%", height="900px"))
+               )),
+      tabPanel("State Comparisons",
+               sidebarLayout(
+                 sidebarPanel(
+                   helpText("Select the content to display, either Confirmed Cases, or Deaths."),
+                   radioButtons('content', NULL, c('Cases', 'Deaths'), 'Cases', inline=T),
+                   helpText("To change the selected states, edit the field and delete states, or add new ones from the drop down list."),
+                   selectInput('states', 'States', states, 
+                               selected = c('New York', 'Oregon', 'Indiana', 'California', 'Washington', 'Arizona'),
+                               multiple = TRUE,
+                               selectize = TRUE, width = NULL),
+                   helpText("Select the scale for the Y axis.  Log Scale can make it easier to compare states, but can be misleading about the magnitude.  Choose normal to see an accurate perspective."),
+                   radioButtons('scale', 'Scale', c('log','normal'), 'log', inline = T)
+                 ),
+                 # Show a plot of the generated distribution
+                 mainPanel(plotOutput("comparison_charts", width="100%", height="900px"))
+               ))
     )
 ))
