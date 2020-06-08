@@ -2,73 +2,111 @@ library(shiny)
 library(tidyverse)
 library(lubridate)
 library(scales)
-theme_set(theme_light())
 
 cvdata <- readRDS('data/cvdata.us.by_state.RDS')
 cvdata.us.by_state <- readRDS('data/cvdata.us.by_state.RDS')
 state.orders <- readRDS('data/orders.events.RDS')
 
+theme.default <- 
+  theme_light() + 
+  theme(text = element_text(size=14),
+        title = element_text(size=18))
+
 # Define server logic required to draw the metric plots
 shinyServer(function(input, output) {
 
-  data <- reactive({
-    cvdata %>%
-      filter(State %in% input$states) %>%
-      mutate(State=fct_drop(State)) %>%
-      arrange(State, Date) %>%
-      filter( Cases > 0)
+  data <- function(states, show.all=F) {
+    if (!show.all | length(states) == 0) {
+      cvdata %>%
+        filter(State %in% states) %>%
+        mutate(State=fct_drop(State)) %>%
+        arrange(State, Date) %>%
+        filter( Cases > 0)
+    } else {
+      cvdata %>%
+        group_by(Date) %>%
+        summarize(Cases = sum(Cases),
+                  Cases.Diff5 = sum(Cases.Diff5),
+                  Cases.Growth5 = sum(Cases.Diff5) / sum(Cases),
+                  Deaths = sum(Deaths),
+                  Deaths.Diff5 = sum(Deaths.Diff5),
+                  Deaths.Growth5 = sum(Deaths.Diff5) / sum(Deaths))
+    }
+  }
+  
+  start_date <- reactive({
+    mdy('02/26/2020')
   })
+  end_date <- reactive({
+    max(cvdata$Date)
+  })
+  
   output$comparison_charts <- renderPlot({
-      df <- data()
-      df[, 'value'] <- df[,input$content]
-        
-      start_date <- min(df$Date)
-      end_date <- max(df$Date)
-      breaks <- seq(end_date,
-                    start_date,
-                    by="-1 week") %>% rev()
-      if (breaks[1] != start_date) {
-        breaks <- c(breaks[1]-days(7), breaks)
-        start_date <- breaks[1]
-      }
-      g <- ggplot(df) +
-        aes(Date, value, color=State) + 
-        geom_line() + 
-        ggtitle(str_c('COVID-19 ', input$content, ', by State')) +
-        xlab(NULL) +
-        coord_cartesian(xlim=c(start_date, end_date)) +
-        scale_x_date(breaks=breaks, date_labels = '%m/%d', date_minor_breaks='1 day')
-      
-      if (input$scale == 'log') {
-        g + scale_y_log10(labels=comma) + labs(subtitle = 'Log Scale') 
-      } else {
-        g + scale_y_continuous()
-      }
-    })
+    show.all <- input$all_states
+    df <- data(input$states, show.all)
+    df[, 'value'] <- df[,input$content]
+    df[, 'value.label'] <- comma(df$value)
+    
+    start_date.adj <- mdy('03-14-2020')
+    breaks <- seq(end_date(),
+                  start_date.adj,
+                  by="-1 week") %>% rev()
+    if (breaks[1] != start_date.adj) {
+      breaks <- c(breaks[1]-days(7), breaks)
+      start_date.adj <- breaks[1]
+    }
+    g <- ggplot(df) +
+      geom_line() + 
+      ggtitle(str_c('COVID-19 ', input$content, ifelse(show.all, ', All States', ', by State'))) +
+      xlab(NULL) +
+      coord_cartesian(xlim=c(start_date.adj, end_date())) +
+      scale_x_date(breaks=breaks, date_labels = '%m/%d', date_minor_breaks='1 day') +
+      theme.default +
+      theme(legend.position=c(0.1, 0.9)) +
+      ylab(NULL)
+    
+    if (show.all) {
+      g <- g + aes(Date, value) +
+       geom_text(data = ~tail(.x, 1), 
+                 aes(label = paste(value.label, input$content)),
+                 size=8,
+                 color='red',
+                 hjust='right',
+                 nudge_x = -2) 
+    } else {
+      g <- g + aes(Date, value, color=State) 
+    }
+    
+    if (input$scale == 'log') {
+      g <- g + scale_y_log10(labels=comma) + labs(subtitle = 'Log Scale') 
+    } else {
+      g <- g + scale_y_continuous(labels=comma)
+    }
+    g
+  })
   
   output$detail_charts <- renderPlot({
     name <- input$state
-    state.data <- filter(cvdata.us.by_state, State == name) %>%
-      mutate(Daily.Increase=round(Cases.Diff5))
-    orders <- filter(state.orders, State==name)
-    start_date <- mdy('02/26/2020')
-    end_date <- max(state.data$Date)
-    date.breaks <- seq(end_date,
-                       start_date,
+    state.data <- data(input$state) %>% mutate(Daily.Increase=round(Cases.Diff5))
+
+    orders <- filter(state.orders, State==name) 
+
+
+    date.breaks <- seq(end_date(),
+                       start_date(),
                        by="-1 week") %>% rev()
     last.recorded.value <- tail(state.data, 1) %>% pull(input$overlay)
     # scale the overlay so it fits in the graph
     scale.factor <- 1.1 * max(state.data$Cases.Diff5) / last.recorded.value
     state.data$Overlay <- unlist(state.data[input$overlay]) * scale.factor
     
-    ggplot(state.data) +
+    g <- ggplot(state.data) +
       aes(x=Date, y=Cases.Diff5) +
-      geom_line(color='blue') + 
+      geom_line(color='#999999') + 
       geom_text(aes(label=Daily.Increase), 
                 nudge_y=4,
                 check_overlap=T,
                 color='black') +
-      geom_smooth(alpha=0.05, method='loess', color='blue', fill='blue', fullrange=T, span=0.5, size=0.5, linetype=3) +
       ggtitle(paste(name, 'Change in Confirmed Cases, Five Day Average'),
               subtitle = str_c("Reported data through ", format(max(cvdata.us.by_state$Date), "%B %d, %Y"))) +
       ylab("Daily Increase") +
@@ -76,29 +114,51 @@ shinyServer(function(input, output) {
                 aes(label=paste0(input$overlay, ': ',comma(last.recorded.value))),
                 y=last.recorded.value * scale.factor,
                 color='red',
-                size=4,
+                size=6,
                 nudge_y=0.1 * last.recorded.value * scale.factor,
                 nudge_x=-12,
                 show.legend = F) +
-      geom_vline(data=orders,
-                 aes(xintercept=date, color=type),
-                 alpha=0.5,
-                 size=1, 
-                 show.legend = F) +
-      geom_text(data=orders,
-                aes(x=date,
-                    colour=type,
-                    y=0.03*last.recorded.value*scale.factor * ifelse(type=='open', 1, -1),
-                    label=paste(desc, format(date, '%B %d'))),
-                hjust='left',
-                nudge_x=1,
-                show.legend = F) +
-      scale_color_manual(values=c(close='#11AA11', open='#CC6666')) +
+
+      theme.default +
+      theme(legend.position='bottom',
+            legend.text=element_text(size=14,lineheight = 12),
+            legend.direction='vertical',
+            legend.spacing=unit(12,'points')) +
+      scale_color_manual(name=NULL, 
+                         values=c(close='#3333BB', open='#CC6666'),
+                        
+                         labels=paste(orders$desc, format(orders$date, '%B %d'))) +
+     
       xlab(NULL)  +
       scale_y_continuous(name='Daily Increase', sec.axis = sec_axis(trans = ~./scale.factor, name = input$overlay)) +
-      geom_line(aes(y=Overlay), color='red') +
-      coord_cartesian(xlim=c(ymd('2020-03-15'), end_date)) +
+      #coord_cartesian(xlim=c(start_date(), end_date())) +
+      geom_line(aes(y=Overlay), color='red', alpha=0.6) +
       scale_x_date(breaks=date.breaks, date_labels = '%m/%d', date_minor_breaks='1 day')
+    if (input$show_lockdown) {
+      if (any(orders$type == 'close')) {
+        lockdown.range <- filter(state.data, Date >= min(orders$date))
+        if (any(orders$type == 'open')) {
+          lockdown.range <- filter(lockdown.range, Date <= max(orders$date))
+        }
+      } else {
+        lockdown.range <- head(state.data, 0)
+      }
+      g <- g +
+        geom_vline(data=orders,
+                   aes(xintercept=date, color=type),
+                   alpha=0.5,
+                   size=1, 
+                   linetype=2,
+                   show.legend = T) +
+        geom_area(data=lockdown.range,
+                  #aes(ymax=Cases.Diff5),
+                  fill='#aec0c6',
+                  alpha=0.2) 
+    }
+    if (input$show_trend) {
+      g <- g + geom_smooth(alpha=0.05, method='loess', color='black', fill='green', fullrange=T, span=0.5, size=0.5, linetype=3) 
+    }
+    g
   })
 })
 
