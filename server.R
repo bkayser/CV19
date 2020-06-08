@@ -2,13 +2,15 @@ library(shiny)
 library(tidyverse)
 library(lubridate)
 library(scales)
+library(ggthemes)
+source('labels.R')
 
 cvdata <- readRDS('data/cvdata.us.by_state.RDS')
 cvdata.us.by_state <- readRDS('data/cvdata.us.by_state.RDS')
 state.orders <- readRDS('data/orders.events.RDS')
 
 theme.default <- 
-  theme_light() + 
+  theme_tufte() + 
   theme(text = element_text(size=14),
         title = element_text(size=18))
 
@@ -45,7 +47,8 @@ shinyServer(function(input, output) {
     show.all <- input$all_states
     df <- data(input$states, show.all)
     df[, 'value'] <- df[,input$content]
-    df[, 'value.label'] <- comma(df$value)
+    df[, 'value.label'] <- ifelse(str_ends(input$content, 'Growth5'), percent(df$value), comma(df$value))
+    value.label <- names(cvdata.cols)[cvdata.cols == input$content]
     
     start_date.adj <- mdy('03-14-2020')
     breaks <- seq(end_date(),
@@ -57,18 +60,16 @@ shinyServer(function(input, output) {
     }
     g <- ggplot(df) +
       geom_line() + 
-      ggtitle(str_c('COVID-19 ', input$content, ifelse(show.all, ', All States', ', by State'))) +
-      xlab(NULL) +
+      ggtitle(str_c(value.label, ifelse(show.all, ', All States', ', by State'))) +
       coord_cartesian(xlim=c(start_date.adj, end_date())) +
       scale_x_date(breaks=breaks, date_labels = '%m/%d', date_minor_breaks='1 day') +
       theme.default +
-      theme(legend.position=c(0.1, 0.9)) +
-      ylab(NULL)
+      theme(legend.position=c(0.1, 0.9)) 
     
     if (show.all) {
       g <- g + aes(Date, value) +
        geom_text(data = ~tail(.x, 1), 
-                 aes(label = paste(value.label, input$content)),
+                 aes(label = paste(value.label, value.label)),
                  size=8,
                  color='red',
                  hjust='right',
@@ -82,7 +83,9 @@ shinyServer(function(input, output) {
     } else {
       g <- g + scale_y_continuous(labels=comma)
     }
-    g
+    g+
+      ylab(NULL) +
+      xlab(NULL)
   })
   
   output$detail_charts <- renderPlot({
@@ -99,6 +102,8 @@ shinyServer(function(input, output) {
     # scale the overlay so it fits in the graph
     scale.factor <- 1.1 * max(state.data$Cases.Diff5) / last.recorded.value
     state.data$Overlay <- unlist(state.data[input$overlay]) * scale.factor
+    overlay.label <- names(cvdata.cols)[cvdata.cols == input$overlay]
+    overlay.format <- ifelse(str_ends(input$overlay, 'Growth5'), percent, comma)
     
     g <- ggplot(state.data) +
       aes(x=Date, y=Cases.Diff5) +
@@ -111,14 +116,13 @@ shinyServer(function(input, output) {
               subtitle = str_c("Reported data through ", format(max(cvdata.us.by_state$Date), "%B %d, %Y"))) +
       ylab("Daily Increase") +
       geom_text(data=~ tail(.x, 1), 
-                aes(label=paste0(input$overlay, ': ',comma(last.recorded.value))),
+                aes(label=paste0(overlay.label, ': ',overlay.format(last.recorded.value))),
                 y=last.recorded.value * scale.factor,
                 color='red',
                 size=6,
                 nudge_y=0.1 * last.recorded.value * scale.factor,
                 nudge_x=-12,
                 show.legend = F) +
-
       theme.default +
       theme(legend.position='bottom',
             legend.text=element_text(size=14,lineheight = 12),
@@ -126,14 +130,16 @@ shinyServer(function(input, output) {
             legend.spacing=unit(12,'points')) +
       scale_color_manual(name=NULL, 
                          values=c(close='#3333BB', open='#CC6666'),
-                        
                          labels=paste(orders$desc, format(orders$date, '%B %d'))) +
-     
       xlab(NULL)  +
-      scale_y_continuous(name='Daily Increase', sec.axis = sec_axis(trans = ~./scale.factor, name = input$overlay)) +
+      scale_y_continuous(name='Daily Increase', 
+                         sec.axis = sec_axis(trans = ~./scale.factor, 
+                                             name = overlay.label,
+                                             labels = overlay.format)) +
       #coord_cartesian(xlim=c(start_date(), end_date())) +
       geom_line(aes(y=Overlay), color='red', alpha=0.6) +
       scale_x_date(breaks=date.breaks, date_labels = '%m/%d', date_minor_breaks='1 day')
+
     if (input$show_lockdown) {
       if (any(orders$type == 'close')) {
         lockdown.range <- filter(state.data, Date >= min(orders$date))

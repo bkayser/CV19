@@ -3,7 +3,12 @@ rmarkdown::render('States.Rmd')
 rmarkdown::render('International.Rmd')
 
 rsconnect::deployApp(appDir = "~/Projects/Covid19", 
-                     appFiles = c('server.R','ui.R', 'data/cvdata.us.by_state.RDS', 'data/cvdata.us.RDS', 'data/orders.events.RDS'),
+                     appFiles = c('server.R',
+                                  'ui.R',
+                                  'labels.R', 
+                                  'data/cvdata.us.by_state.RDS',
+                                  'data/cvdata.us.RDS', 
+                                  'data/orders.events.RDS'),
                      account = "surprise", 
                      server = "shinyapps.io", 
                      appName = "COVID19Demo",      

@@ -1,4 +1,5 @@
 library(shiny)
+source('labels.R')
 
 states <- c("Alabama", "Alaska", "Arizona", "Arkansas", "California", "Colorado", "Connecticut", "Delaware", 
             "District of Columbia", "Florida", "Georgia", "Hawaii", "Idaho", "Illinois", "Indiana", "Iowa", 
@@ -22,7 +23,11 @@ shinyUI(fluidPage(title="COVID-19 Data Console",
                                multiple = FALSE,
                                selectize = T, width = NULL),
                    helpText("Select the data to overlay:"),
-                   radioButtons('overlay', 'Overlay', c('Cases','Deaths'), 'Cases', inline = T),
+                   radioButtons('overlay', 
+                                label = NULL, 
+                                choices = cvdata.cols,
+                                selected = 'Cases',
+                                inline = F),
                    checkboxInput("show_lockdown", "Show Lockdown", TRUE),
                    checkboxInput("show_trend", "Show Trendline", FALSE)
                  ),
@@ -34,10 +39,10 @@ shinyUI(fluidPage(title="COVID-19 Data Console",
                sidebarLayout(
                  sidebarPanel(width=3,
                    helpText("Select the content to display, either Confirmed Cases, or Deaths."),
-                   radioButtons('content', NULL, c('Cases', 'Deaths'), 'Cases', inline=T),
+                   radioButtons('content', NULL, cvdata.cols, 'Cases', inline=F),
                    helpText("To change the selected states, edit the field and delete states, or add new ones from the drop down list."),
                    selectInput('states', 'States', states, 
-                               selected = c('New York', 'Oregon', 'Indiana', 'California', 'Washington', 'Arizona'),
+                               selected = c('New York', 'Oregon', 'California', 'Arizona'),
                                multiple = TRUE,
                                selectize = TRUE, width = NULL),
                    checkboxInput("all_states", "Show National Summary", value=FALSE),
