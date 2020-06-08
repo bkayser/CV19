@@ -353,6 +353,8 @@ state.summary.g('OR', 'Cases')
 
 
 ```{r echo=F, fig.height=4, fig.width=5}
+cvdata.or <- filter(cvdata.us.by_state, State.Code == 'OR') %>%
+  mutate(Daily.Increase=round(Cases.Diff5)) 
 
 g <- ggplot(cvdata.or) +
   aes(Date, Deaths.Diff5) +
