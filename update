@@ -1,0 +1,3 @@
+#!/usr/bin/env bash
+echo "YES"
+R -f utils/update_reports.R
