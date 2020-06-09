@@ -9,8 +9,9 @@ states <- c("Alabama", "Alaska", "Arizona", "Arkansas", "California", "Colorado"
             "South Carolina", "South Dakota", "Tennessee", "Texas", "Utah", "Vermont", "Virginia", "Washington", 
             "West Virginia", "Wisconsin", "Wyoming")
 
+variable_choices <- cvdata.cols[cvdata.cols != 'Cases.Diff5']
+
 shinyUI(fluidPage(title="COVID-19 Data Console",
-    
     # Application title
     titlePanel("Exploring COVID-19 Data"),
     tabsetPanel(
@@ -22,10 +23,11 @@ shinyUI(fluidPage(title="COVID-19 Data Console",
                                selected = 'Oregon',
                                multiple = FALSE,
                                selectize = T, width = NULL),
+                   checkboxInput("combined", "Show National Summary", value=FALSE),
                    helpText("Select the data to overlay:"),
                    radioButtons('overlay', 
                                 label = NULL, 
-                                choices = cvdata.cols,
+                                choices = variable_choices,
                                 selected = 'Cases',
                                 inline = F),
                    checkboxInput("show_lockdown", "Show Lockdown", TRUE),
