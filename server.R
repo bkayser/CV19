@@ -3,9 +3,8 @@ library(tidyverse)
 library(lubridate)
 library(scales)
 library(ggthemes)
-source('labels.R')
+source('utils/labels.R')
 
-#cvdata <- readRDS('data/cvdata.us.by_state.RDS')
 cvdata.us.by_state <- readRDS('data/cvdata.us.by_state.RDS')
 state.orders <- readRDS('data/orders.events.RDS')
 
@@ -31,10 +30,12 @@ shinyServer(function(input, output) {
                   Cases = sum(Cases),
                   Cases.Per100K = Cases * 100000 / Population,
                   Cases.Diff5 = sum(Cases.Diff5),
+                  Cases.Diff = sum(Cases.Diff),
                   Cases.Growth5 = sum(Cases.Diff5) / sum(Cases),
                   
                   Deaths = sum(Deaths),
                   Deaths.Per100K = Deaths * 100000 / Population,
+                  Deaths.Diff = sum(Deaths.Diff),
                   Deaths.Diff5 = sum(Deaths.Diff5),
                   Deaths.Growth5 = sum(Deaths.Diff5) / sum(Deaths))
     }
@@ -44,7 +45,7 @@ shinyServer(function(input, output) {
     mdy('02/26/2020')
   })
   end_date <- reactive({
-    max(cvdata$Date)
+    max(cvdata.us.by_state$Date)
   })
   
   output$comparison_charts <- renderPlot({

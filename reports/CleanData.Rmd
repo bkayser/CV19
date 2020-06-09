@@ -21,7 +21,7 @@ Initialize the Notebook loading the following required libraries.
 library(tidyverse)
 library(scales)
 old_theme <- theme_set(theme_light())
-source('utils.R')
+source('../utils/utils.R')
 ```
 
 
@@ -45,7 +45,7 @@ We are pulling in data from the github repo of the 2019 Novel Coronavirus Visual
 Let's update the CV data directly from the Johns Hopkins git repo.  The first thing to do is check for any daily updates by updating the git submodule:
 
 ```{r}
-system('git submodule update --remote COVID-19')
+system('git submodule update --remote ../COVID-19')
 ```
 
 Load the timeseries data.  We'll need to convert the table from a wide format where the time series is in columns to a narrow format where each observation is a single datapoint for a day.
@@ -53,11 +53,11 @@ Load the timeseries data.  We'll need to convert the table from a wide format wh
 ### Load Timeseries Data
 
 ```{r, echo=T}
-cases <- read_and_clean('COVID-19/csse_covid_19_data/csse_covid_19_time_series/time_series_covid19_confirmed_US.csv')
-deaths <- read_and_clean('COVID-19/csse_covid_19_data/csse_covid_19_time_series/time_series_covid19_deaths_US.csv')
-countries.cases <- read_and_clean('COVID-19/csse_covid_19_data/csse_covid_19_time_series/time_series_covid19_confirmed_global.csv')
-countries.deaths <- read_and_clean('COVID-19/csse_covid_19_data/csse_covid_19_time_series/time_series_covid19_deaths_global.csv')
-countries.recovered <- read_and_clean('COVID-19/csse_covid_19_data/csse_covid_19_time_series/time_series_covid19_recovered_global.csv')
+cases <- read_and_clean('../COVID-19/csse_covid_19_data/csse_covid_19_time_series/time_series_covid19_confirmed_US.csv')
+deaths <- read_and_clean('../COVID-19/csse_covid_19_data/csse_covid_19_time_series/time_series_covid19_deaths_US.csv')
+countries.cases <- read_and_clean('../COVID-19/csse_covid_19_data/csse_covid_19_time_series/time_series_covid19_confirmed_global.csv')
+countries.deaths <- read_and_clean('../COVID-19/csse_covid_19_data/csse_covid_19_time_series/time_series_covid19_deaths_global.csv')
+countries.recovered <- read_and_clean('../COVID-19/csse_covid_19_data/csse_covid_19_time_series/time_series_covid19_recovered_global.csv')
 ```
 
 ### Load Census Data
@@ -92,7 +92,8 @@ population_data <- read.csv('https://www2.census.gov/programs-surveys/popest/dat
   as_tibble()
 
 # Correct some data from NYC: New York County is reported for all of New York City.
-nyc <- filter(population_data, State == 'New York' & (CTYNAME %in% c('Bronx County', 'Kings County', 'Queens County', 'Richmond County', 'New York County'))) %>%
+nyc <- population_data %>%
+  filter(State == 'New York' & (CTYNAME %in% c('Bronx County', 'Kings County', 'Queens County', 'Richmond County', 'New York County'))) %>%
   select(Population, Annual.Deaths, Area) %>%
   colSums()
 ny.row <- which(population_data$CTYNAME == 'New York County')
@@ -130,7 +131,7 @@ Start combining tables with external data.  Also invokes `calculate_differential
 Join in information on the status of states.  Information scraped from a Washington Post article on the status of each state.
 
 ```{r}
-states.summary <- readRDS('data/states.status.RDS')
+states.summary <- readRDS('../data/states.status.RDS')
 ```
 
 Join the US confirmed cases to deaths and census population data.  Create a single table, `cvdata.us`.
@@ -153,7 +154,7 @@ rm(cases, deaths, counties)
 Join the cases and deaths for country data into a single table, `cvdata.i18n`.
 
 ```{r}
-populations <- read.csv('data/population.csv', skip = 3, stringsAsFactors = F) %>% select(Country = Country.Name, Population = X2018)
+populations <- read.csv('../data/population.csv', skip = 3, stringsAsFactors = F) %>% select(Country = Country.Name, Population = X2018)
 populations[populations$Country == 'Korea, Rep.', 'Country'] = 'Korea, South'
 populations[populations$Country == 'United States', 'Country'] = 'US'
 populations[populations$Country == 'Russian Federation', 'Country'] = 'Russia'
@@ -205,14 +206,6 @@ rm(states)
 
 ```
 
-Create a single timeseries table just for Italy called `italy`.
-
-```{r}
-italy <- cvdata.i18n %>%
-  filter(Country == 'Italy') %>%
-  select(-Key, -Lat, -Long, -Country) 
-
-```
 
 ### Estimate Recoveries
 
@@ -278,8 +271,8 @@ ggplot() +
 # Save the Data
 
 ```{r echo=T}
-saveRDS(cvdata.us, 'data/cvdata.us.RDS')
-saveRDS(cvdata.us.by_state, 'data/cvdata.us.by_state.RDS')
-saveRDS(cvdata.i18n, 'data/cvdata.i18n.RDS')
+saveRDS(cvdata.us, '../data/cvdata.us.RDS')
+saveRDS(cvdata.us.by_state, '../data/cvdata.us.by_state.RDS')
+saveRDS(cvdata.i18n, '../data/cvdata.i18n.RDS')
 ```
 

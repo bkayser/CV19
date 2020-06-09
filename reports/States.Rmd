@@ -20,7 +20,7 @@ library(tidyverse)
 library(scales)
 library(caTools)
 library(ggthemes)
-source('utils.R')
+source('../utils/utils.R')
 knitr::opts_chunk$set(echo=F)
 #old_theme <- theme_set(theme_fivethirtyeight())
 library(ggthemes)
@@ -41,9 +41,9 @@ library(ggthemes)
 # Load Datasets
 
 ```{r echo=T}
-cvdata.us <- readRDS('data/cvdata.us.RDS')
-cvdata.us.by_state <- readRDS('data/cvdata.us.by_state.RDS')
-state.orders <- readRDS('data/orders.events.RDS')
+cvdata.us <- readRDS('../data/cvdata.us.RDS')
+cvdata.us.by_state <- readRDS('../data/cvdata.us.by_state.RDS')
+state.orders <- readRDS('../data/orders.events.RDS')
 
 
 # Let's first set up some parameters for the graph's X axis.

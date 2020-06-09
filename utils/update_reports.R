@@ -1,11 +1,11 @@
-rmarkdown::render('CleanData.Rmd')
-rmarkdown::render('States.Rmd')
-rmarkdown::render('International.Rmd')
+rmarkdown::render('reports/CleanData.Rmd')
+rmarkdown::render('reports/States.Rmd')
+rmarkdown::render('reports/International.Rmd')
 
 rsconnect::deployApp(appDir = "~/Projects/Covid19", 
                      appFiles = c('server.R',
                                   'ui.R',
-                                  'labels.R', 
+                                  'utils/labels.R', 
                                   'data/cvdata.us.by_state.RDS',
                                   'data/cvdata.us.RDS', 
                                   'data/orders.events.RDS'),
@@ -20,5 +20,5 @@ rsconnect::deployApp(appDir = "~/Projects/Covid19",
 #rmarkdown::render('Predict.Rmd')
 #system("open Predict.nb.html")
 system("open https://surprise.shinyapps.io/COVID19Demo")
-system("open States.nb.html")
-system("open International.nb.html")
+system("open reports/States.nb.html")
+system("open reports/International.nb.html")

@@ -19,7 +19,7 @@ echo: TRUE
 library(tidyverse)
 library(scales)
 library(caTools)
-source('utils.R')
+source('../utils/utils.R')
 knitr::opts_chunk$set(echo=F)
 # old_theme <- theme_set(ggthemes::theme_fivethirtyeight())
 
@@ -41,9 +41,9 @@ knitr::opts_chunk$set(echo=F)
 # Load Datasets
 
 ```{r echo=T}
-cvdata.us <- readRDS('data/cvdata.us.RDS')
-cvdata.us.by_state <- readRDS('data/cvdata.us.by_state.RDS')
-cvdata.i18n <- readRDS('data/cvdata.i18n.RDS')
+cvdata.us <- readRDS('../data/cvdata.us.RDS')
+cvdata.us.by_state <- readRDS('../data/cvdata.us.by_state.RDS')
+cvdata.i18n <- readRDS('../data/cvdata.i18n.RDS')
 ```
 
 # Data Exploration

@@ -119,8 +119,8 @@ add_estimated_recoveries <- function(data) {
 
 
 get_geographic_data <- function() {
-  data <- read.csv('data/county_area.csv', skip=7)
-  state_names <- as.character(read.csv('data/state_abbrev.csv')$State)
+  data <- read.csv('../data/county_area.csv', skip=7)
+  state_names <- as.character(read.csv('../data/state_abbrev.csv')$State)
   
   for (i in 1:nrow(data)) {
     if (data$Name[i] %in% state_names) {
