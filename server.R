@@ -31,13 +31,13 @@ shinyServer(function(input, output) {
                   Cases.Per100K = Cases * 100000 / Population,
                   Cases.Diff5 = sum(Cases.Diff5),
                   Cases.Diff = sum(Cases.Diff),
-                  Cases.Growth5 = sum(Cases.Diff5) / sum(Cases),
+                  Cases.Growth5 = Cases.Diff5 / Cases,
                   
-                  Deaths = sum(Deaths),
+                  Deaths = sum(Deaths, na.rm=T),
                   Deaths.Per100K = Deaths * 100000 / Population,
                   Deaths.Diff = sum(Deaths.Diff),
-                  Deaths.Diff5 = sum(Deaths.Diff5),
-                  Deaths.Growth5 = sum(Deaths.Diff5) / sum(Deaths))
+                  Deaths.Diff5 = sum(Deaths.Diff5, na.rm=T),
+                  Deaths.Growth5 = Deaths.Diff5 / Deaths)
     }
   }
   
@@ -112,7 +112,11 @@ shinyServer(function(input, output) {
                        by="-1 week") %>% rev()
     last.recorded.value <- tail(state.data, 1) %>% pull(input$overlay)
     # scale the overlay so it fits in the graph
-    scale.factor <- 1.1 * max(state.data$Cases.Diff5) / max(state.data[input$overlay])
+    if (input$overlay == 'Cases.Diff') {
+      scale.factor <- 1
+    } else {
+      scale.factor <- 1.1 * max(state.data$Cases.Diff5, na.rm=T) / max(state.data[input$overlay], na.rm=T)
+    }
     state.data$Overlay <- unlist(state.data[input$overlay]) * scale.factor
     overlay.label <- names(cvdata.cols)[cvdata.cols == input$overlay]
     overlay.format <- ifelse(str_ends(input$overlay, 'Growth5'), percent, comma)
@@ -141,13 +145,23 @@ shinyServer(function(input, output) {
             legend.direction='vertical',
             legend.spacing=unit(12,'points')) +
       xlab(NULL)  +
-      scale_y_continuous(name='Daily Increase', 
-                         sec.axis = sec_axis(trans = ~./scale.factor, 
-                                             name = overlay.label,
-                                             labels = overlay.format)) +
-      geom_line(aes(y=Overlay), color='#FF3333', alpha=0.6) +
       scale_x_date(breaks=date.breaks, date_labels = '%m/%d', date_minor_breaks='1 day')
 
+    if (scale.factor != 1) {
+      g <- g + scale_y_continuous(name='Daily Increase', 
+                                  sec.axis = sec_axis(trans = ~./scale.factor, 
+                                                      name = overlay.label,
+                                                      labels = overlay.format)) 
+    } else {
+      g <- g + scale_y_continuous(name='Daily Increase') 
+    }
+      
+    if (str_ends(input$overlay, "5" )) {
+      g <- g + geom_line(aes(y=Overlay), color='#FF3333', alpha=0.6) 
+    } else {
+      g <- g + geom_bar(aes(y=Overlay), 
+                        fill='#FF3333', alpha=0.1, stat='identity')      
+    }
     if (input$show_lockdown) {
       if (any(orders$type == 'close')) {
         lockdown.range <- filter(state.data, Date >= min(orders$date))

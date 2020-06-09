@@ -1,7 +1,7 @@
 library(tidyverse)
 library(lubridate)
-library(scales)
-library(wpp2019)
+#library(scales)
+#library(wpp2019)
 
 
 read_and_clean <- function(infile) {
@@ -50,8 +50,8 @@ read_and_clean <- function(infile) {
   return(cv.wide)
 }
 
-calculate_differentials <- function(id, target_variables) {
-  infection_data <- arrange(id, Key, Date)
+calculate_differentials <- function(data, target_variables) {
+  infection_data <- arrange(data, Key, Date)
   boundaries <- which(infection_data$Key[2:nrow(infection_data)] != infection_data$Key[1:nrow(infection_data)-1])
   target_variables.diff <- paste0(target_variables, '.Diff')
   target_variables.diff5 <- paste0(target_variables, '.Diff5')
@@ -86,6 +86,38 @@ calculate_differentials <- function(id, target_variables) {
   }
   return(infection_data)
 }
+
+# 
+# data <- 
+#   list(tibble(Key = 'toyota',
+#               Date = seq(today(), by = -1, length.out = 50),
+#               ColA = 1:50,
+#               Population = 100,
+#               ColB = seq(24, -25, by=-1),
+#               ColC = rnorm(50, mean=25, sd=10)),
+#        tibble(Key = 'ford',
+#               Date = seq(today(), by = -1, length.out = 50),
+#               ColA = 50:99,
+#               Population = 1000,              
+#               ColB = seq(-20, by=2, length.out=50),
+#               ColC = rnorm(50, mean=50, sd=5) + seq(50, by=10, length.out=50)),
+#        tibble(Key = 'GM', 
+#               Date = seq(today(), by = -1, length.out = 50),
+#               Population = 100,
+#               ColA = 1:50,
+#               ColB = seq(0, by=7, length.out=50),
+#               ColC = runif(50, 10, 90))) %>% bind_rows()
+# 
+# target_variables <- c('ColA','ColB', 'ColC')
+# calculate_differentials(data, target_variables) %>%
+# ggplot() +
+#   aes(color=Key, x=Date) +
+#   geom_line(aes(y=ColC.Diff), linetype=1) +
+#   geom_line(aes(y=ColC.Diff5), linetype=3) +
+#   facet_grid(rows=vars(Key), scales='free')
+# 
+
+
 
 add_estimated_recoveries <- function(data) {
 
