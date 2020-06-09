@@ -1,8 +1,9 @@
 cvdata.cols <- c('Cases' = 'Cases', 
                  'Cases Per 100K' = 'Cases.Per100K',
-                 'New Cases' = 'Cases.Diff5' ,
+                 'Daily New Cases' = 'Cases.Diff' ,
                  'Growth in Cases' = 'Cases.Growth5',
                  'Deaths' = 'Deaths',
                  'Deaths Per 100K' = 'Deaths.Per100K',
-                 'New Deaths' = 'Deaths.Diff5',
+                 'Daily New Deaths' = 'Deaths.Diff',
+                 'New Deaths, 5 Day Avg' = 'Deaths.Diff5',
                  'Growth in Deaths' = 'Deaths.Growth5')
