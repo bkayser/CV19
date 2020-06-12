@@ -141,8 +141,9 @@ shinyServer(function(input, output) {
                 show.legend = F) +
       theme.default +
       theme(legend.position='bottom',
+            legend.key.size=unit(22, 'point'),
+            legend.key.width = unit(8, 'point'),
             legend.text=element_text(size=14,lineheight = 12),
-            legend.direction='vertical',
             legend.spacing=unit(12,'points')) +
       xlab(NULL)  +
       scale_x_date(breaks=date.breaks, date_labels = '%m/%d', date_minor_breaks='1 day')
@@ -171,33 +172,40 @@ shinyServer(function(input, output) {
       } else {
         lockdown.range <- head(state.data, 0)
       }
+      g <- g + 
+        geom_vline(data=orders,
+                   aes(xintercept=date, color=type, alpha='0'),
+                   size=1, 
+                   show.legend = T) +
+        scale_alpha_manual(values=0, guide=F) +
+        geom_area(data=lockdown.range,
+                  #aes(ymax=Cases.Diff5),
+                  fill='#aec0c6',
+                  alpha=0.2) 
       if (show.all) {
         g <- g +
           geom_vline(data=orders,
                      aes(xintercept=date, color=type),
                      alpha=0.5,
-                     size=0.4, 
-                     show.legend = T) +
+                     size=0.5, 
+                     show.legend = F) +
           scale_color_manual(name=NULL, 
-                             values=c(close='#3333BB', open='#CC6666'),
+                             values=c(close='#3333CC', open='#DD6666'),
                              labels=c('Restrictions put in place',
-                                      'Restrictions lifted'))
+                                      'Restrictions lifted')) 
       } else {
         g <- g +
           geom_vline(data=orders,
                      aes(xintercept=date, color=type),
                      alpha=0.5,
-                     size=1, 
                      linetype=2,
-                     show.legend = T) +
-        scale_color_manual(name=NULL, 
-                           values=c(close='#3333BB', open='#CC6666'),
-                           labels=paste(orders$desc, format(orders$date, '%B %d'))) 
+                     size=0.5, 
+                     show.legend = F) +
+          scale_color_manual(name=NULL, 
+                             values=c(close='#3333CC', open='#DD6666'),
+                             labels=paste(orders$desc, format(orders$date, '%B %d'))) 
       }
-      g <- g + geom_area(data=lockdown.range,
-                         #aes(ymax=Cases.Diff5),
-                         fill='#aec0c6',
-                         alpha=0.2) 
+
     }
     if (input$show_trend) {
       g <- g + geom_smooth(alpha=0.05, method='loess', color='black', fill='green', fullrange=T, span=0.5, size=0.5, linetype=3) 
