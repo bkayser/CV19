@@ -119,6 +119,14 @@ This site has an aggregation of data about testing.  It's pretty messy data but 
 covid.testing <- read.csv('https://covidtracking.com/api/v1/states/daily.csv') %>% 
   as_tibble() %>%
   rename(State.Code=state, Date=date) %>%
+  select(-positiveIncrease,         # Remove deprecated fields
+         -total,
+         -totalTestResults,
+         -totalTestResultsIncrease,
+         -posNeg,
+         -negativeIncrease,
+         -hospitalizedIncrease,
+         -hospitalized) %>%
   mutate(Date = as.Date(as.POSIXct(strptime(as.character(Date), format='%Y%m%d'))))
 ```
 
@@ -198,7 +206,10 @@ cvdata.us.by_state <- cvdata.us %>%
   mutate(State.Code = fct_inorder(as.factor(State.Code)),
          State = fct_inorder(as.factor(State)),
          Infection.Rate = Cases.Diff * 1000000 / Population,
-         Death.Rate = Deaths.Diff * 1000000 / Population) %>%
+         Death.Rate = Deaths.Diff * 1000000 / Population,
+         total = positive + negative,
+         Testing.Rate = total / Population,
+         Testing.Positive.Rate = positive / total) %>%
   add_estimated_recoveries() %>%
   left_join(states.summary, by=c('State', 'State.Code')) %>%
   select(Key, State, State.Code, Region, Division, Date, starts_with('Cases'), starts_with('Deaths'), contains('Recovered'), matches('^[A-Z]', ignore.case=F), -FIPS, everything())
