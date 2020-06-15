@@ -5,7 +5,7 @@ library(scales)
 library(ggthemes)
 source('utils/labels.R')
 
-cvdata.us.by_state <- readRDS('data/cvdata.us.by_state.RDS')
+cvdata.us.by_state <- readRDS('data/cvdata.us.by_state.RDS') 
 state.orders <- readRDS('data/orders.events.RDS')
 
 theme.default <- 
@@ -37,7 +37,11 @@ shinyServer(function(input, output) {
                   Deaths.Per100K = Deaths * 100000 / Population,
                   Deaths.Diff = sum(Deaths.Diff),
                   Deaths.Diff5 = sum(Deaths.Diff5, na.rm=T),
-                  Deaths.Growth5 = Deaths.Diff5 / Deaths)
+                  Deaths.Growth5 = Deaths.Diff5 / Deaths,
+                  
+                  Testing.Rate = sum(total) / Population,
+                  Testing.Positive.Rate = sum(positive) / sum(total),
+                  inIcuCurrently = sum(inIcuCurrently, na.rm=T))
     }
   }
   
@@ -119,7 +123,7 @@ shinyServer(function(input, output) {
     }
     state.data$Overlay <- unlist(state.data[input$overlay]) * scale.factor
     overlay.label <- names(cvdata.cols)[cvdata.cols == input$overlay]
-    overlay.format <- ifelse(str_ends(input$overlay, 'Growth5'), percent, comma)
+    overlay.format <- ifelse(str_ends(input$overlay, 'Growth5') | str_ends(input$overlay, 'Rate'), percent, comma)
     
     g <- ggplot(state.data) +
       aes(x=Date, y=Cases.Diff5) +
