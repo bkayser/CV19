@@ -50,15 +50,54 @@ system('git submodule update --remote ../COVID-19')
 
 Load the timeseries data.  We'll need to convert the table from a wide format where the time series is in columns to a narrow format where each observation is a single datapoint for a day.
 
-### Load Timeseries Data
+The US data in the Johns Hopkins DB seemed to get stuck with confirmed cases and drifted from other sources so I'm 
+using the NY Times for US data and Johns Hopkins for International Data.
 
-```{r, echo=T}
-cases <- read_and_clean('../COVID-19/csse_covid_19_data/csse_covid_19_time_series/time_series_covid19_confirmed_US.csv')
-deaths <- read_and_clean('../COVID-19/csse_covid_19_data/csse_covid_19_time_series/time_series_covid19_deaths_US.csv')
+### Load International Timeseries Data - Johns Hopkins
+
+```{r}
 countries.cases <- read_and_clean('../COVID-19/csse_covid_19_data/csse_covid_19_time_series/time_series_covid19_confirmed_global.csv')
 countries.deaths <- read_and_clean('../COVID-19/csse_covid_19_data/csse_covid_19_time_series/time_series_covid19_deaths_global.csv')
 countries.recovered <- read_and_clean('../COVID-19/csse_covid_19_data/csse_covid_19_time_series/time_series_covid19_recovered_global.csv')
 ```
+
+### Load US Timeseries Data - NY Times
+
+Taken from the raw downloads at https://github.com/nytimes/covid-19-data.
+
+Interactive explorer available [here](https://www.nytimes.com/interactive/2020/us/coronavirus-us-cases.html).
+
+```{r}
+raw_county_data <- read.csv('https://raw.githubusercontent.com/nytimes/covid-19-data/master/us-counties.csv',
+                            stringsAsFactors = F) %>%
+  select(State = state, 
+         FIPS = fips,
+         Date = date,
+         Cases = cases,
+         County = county,
+         Deaths = deaths) %>%
+  mutate(Key = paste0(County, ", ", State, ", US"),
+         Date = ymd(Date)) %>%
+  as_tibble()
+```
+
+Now we need to pad data with zeros.
+
+```{r}
+county_data <- expand_grid(Date = unique(raw_county_data$Date),
+                          Key = unique(raw_county_data$Key)) %>%
+  left_join(unique(select(raw_county_data, Key, County, State, FIPS)),
+            by='Key') %>%
+  left_join(raw_county_data, by=c('Key', 'Date', 'County', 'State', 'FIPS')) %>%
+  mutate(Country = 'US',
+         Lat = 0,
+         Long = 0,
+         Cases = ifelse(is.na(Cases), 0, Cases),
+         Deaths = ifelse(is.na(Deaths), 0, Deaths)) %>%
+  arrange(State, Key, Date)
+rm(raw_county_data)
+```
+
 
 ### Load Census Data
 
@@ -100,6 +139,9 @@ ny.row <- which(population_data$CTYNAME == 'New York County')
 population_data[ny.row, 'Population'] <- nyc['Population']
 population_data[ny.row, 'Annual.Deaths'] <- nyc['Annual.Deaths']
 population_data[ny.row, 'Area'] <- nyc['Area']
+FIPS.nyc <- population_data[ny.row,]$FIPS
+population_data[ny.row, 'CTYNAME'] <- 'New York City'  # This is needed only for NYT sourced cases
+
 # Remove other boroughs since we don't get data for them.
 population_data <- filter(population_data, 
                           State != 'New York' | !(CTYNAME %in% c('Bronx County', 'Kings County', 'Queens County', 'Richmond County'))) 
@@ -142,21 +184,26 @@ Join in information on the status of states.  Information scraped from a Washing
 states.summary <- readRDS('../data/states.status.RDS')
 ```
 
+The cases and deaths data provided for the five counties of New York City is aggregated into a single entity called "New York City" with no FIPS.
+
+For purposes of joining data, I'm going to use the New York County FIPS for "New York City".
+
+```{r}
+county_data[county_data$County == 'New York City', 'FIPS'] <- FIPS.nyc
+```
+
+
 Join the US confirmed cases to deaths and census population data.  Create a single table, `cvdata.us`.
 
 ```{r}
-cvdata.us <- left_join(cases, 
-                       select(deaths, Key, Date, Count),
-                       by=c('Key', 'Date')) %>%
-  rename(Cases = Count.x,
-         Deaths = Count.y) %>%
+cvdata.us <- county_data %>%
   left_join(counties, by='FIPS') %>% 
   left_join(states.summary, by=c('State')) %>%
   filter(!is.na(Region)) %>%
   mutate(State = as.factor(State), 
          County = as.factor(County)) %>%
   calculate_differentials(c('Cases', 'Deaths'))
-rm(cases, deaths, counties)
+rm(counties, county_data)
 ```
 
 Join the cases and deaths for country data into a single table, `cvdata.i18n`.
