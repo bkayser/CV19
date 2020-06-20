@@ -59,13 +59,23 @@ if (date.breaks[1] != start_date) {
 }
 ```
 
+### Data Disclaimer
+
+US Data provided by the New York Times [Covid Data Repository](https://www.nytimes.com/interactive/2020/us/coronavirus-us-cases.html).
+
+    Note: Data are based on reports by states and counties at the time of publication. Local governments may revise reported numbers as they get new information. Some deaths may be reported by officials in two different jurisdictions. When possible, deaths have been reported here in the jurisdiction where the death occurred.
+    Population and demographic data from Census Bureau.
+    
 # Overview of Counties
 
+Including only counties whose population is greater than 2000.
 
-### Top Counties in Cases per Capita:
+### Top Counties in Cases per Capita
+
+
 ```{r}
 cvdata.us %>%
-  filter(!is.na(Division) & Date == end_date & Population > 5000) %>%
+  filter(!is.na(Division) & Date == end_date & Population > 2000) %>%
   arrange(desc(Cases.Per100K)) %>%
   mutate(Label=paste0(County,", ", State.Code)) %>%
   select(Label, Cases.Per100K, Deaths.Per100K, Deaths) %>%
@@ -74,11 +84,11 @@ cvdata.us %>%
 ```
 
 
-
 ### Top Counties in Deaths per Capita:
+
 ```{r}
 cvdata.us %>%
-  filter(!is.na(Division) & Date == end_date & Population > 1000) %>%
+  filter(!is.na(Division) & Date == end_date & Population > 2000) %>%
   arrange(desc(Deaths.Per100K)) %>%
   mutate(Label=paste0(County,", ", State.Code)) %>%
   select(Label,Deaths, Deaths.Per100K) %>%
@@ -90,7 +100,7 @@ cvdata.us %>%
 ```{r fig.height=4, fig.width=5}
 hotspots <- cvdata.us %>%
   mutate(Label=paste0(County,", ", State.Code)) %>%
-  filter(!is.na(Division) & Date == end_date & Population > 1000 & Cases.Diff5 >= 25) %>%
+  filter(!is.na(Division) & Date == end_date & Population > 2000 & Cases.Diff5 >= 25) %>%
   arrange(desc(Cases.Growth5)) 
 
 ggplot(head(hotspots, 25)) +
@@ -110,7 +120,7 @@ ggplot(head(hotspots, 25)) +
 
 ```
 
-```{r}
+```{r fig.height=3, fig.width=4}
 cvdata.us %>%
   filter(Key %in% hotspots$Key[1:8]) %>%
   mutate(Label=reorder(as.factor(paste0(County,", ", State.Code)), Cases.Growth5)) %>%
@@ -144,63 +154,49 @@ cvdata.us %>%
 rm(hotspots)  
 ```
 
-## Confirmed Case History in Top 10 States
+```{r}
 
-```{r echo=F}
-cvdata.us.current <- filter(cvdata.us.by_state, Date == end_date)
-Cases.top.10 <- arrange(cvdata.us.current, desc(Cases)) %>% head(10) %>% pull(State) 
+cvdata.current <- cvdata.us.by_state %>%
+  filter(Date == max(cvdata.us.by_state$Date)) 
 
-g <- cvdata.us.by_state %>%
-  filter(State %in% Cases.top.10) %>%
-  mutate(State = factor(State, Cases.top.10)) %>%
-  arrange(State, Date) %>%
-  filter( Cases > 0) %>%
-  ggplot() +
-  aes(Date, Cases, color=State) +
-  ggtitle('COVID-19 Confirmed Cases by States') +
-  geom_line() + 
-  xlab(NULL) +
-  coord_cartesian(xlim=c(start_date, end_date)) +
-  scale_x_date(breaks=date.breaks, date_labels = '%m/%d', date_minor_breaks='1 day')
-
-g + scale_y_continuous(labels=comma) 
-g + scale_y_log10(labels=comma) + labs(subtitle="Log Scale")
+model <- lm(data=cvdata.current,
+   Cases.Diff5.Per100K ~ gov.party + status + Division)
+summary(model)
 ```
 
+```{r}
 
-## Deaths in Top 10 States
+ggplot(cvdata.current) +
+  aes(y=Cases.Diff5.Per100K, 
+      x=Testing.Rate, 
+      size=status,
+      color=gov.party) +
+  scale_color_manual(values=c('R'='red', 'D'='blue')) +
+  geom_point() +
+  coord_flip()
 
-```{r echo=F}
-Deaths.top.10 <- arrange(cvdata.us.current, desc(Deaths)) %>% head(10) %>% pull(State) 
-
-g <- cvdata.us.by_state %>%
-  filter(State %in% Deaths.top.10) %>%
-  mutate(State = factor(State, Deaths.top.10)) %>%
-  arrange(State, Date) %>%
-  filter( Deaths > 0) %>%
-  ggplot() +
-  aes(Date, Deaths, color=State) +
-  ggtitle('COVID-19 Deaths by States') +
-  geom_line() + 
-  xlab(NULL) +
-  coord_cartesian(xlim=c(start_date, end_date)) +
-  scale_x_date(breaks=date.breaks, date_labels = '%m/%d', date_minor_breaks='1 day')
-
-g + scale_y_continuous(labels=comma) 
-g + scale_y_log10(labels=comma) + labs(subtitle="Log Scale")
+ggplot(cvdata.current) +
+  aes(y=Cases.Diff5, x=gov.party) +
+  geom_boxplot() +
+  coord_flip()
 ```
-
+# State by State Comparisons
 
 ### Confirmed Cases per Capita
 
-```{r fig.width=5, fig.height=4}
+```{r fig.width=5, fig.height=5}
 cvdata.us.current %>% 
   ggplot() +
   aes(x=reorder(State.Code, Cases.Per100K), y=Cases.Per100K, fill=Cases.Per100K) +
   geom_col(show.legend=F) +
   scale_fill_gradient(low='#00FFAA', high='red', trans='log10') +
   scale_y_continuous(position = 'right') +
-  geom_text(aes(label=round(Cases.Per100K)), size=4, nudge_y=30) +
+  geom_text(aes(label=round(Cases.Per100K)), 
+            hjust='right',
+            size=4, 
+            nudge_y=-10,
+            fontface='bold',
+            color='white') +
   coord_flip() + # +  scale_y_log10()
   ylab('Cases per 100K Population') +
   xlab(NULL) +
@@ -220,7 +216,6 @@ Right now you can see New York is a long way from that but the LOESS trend line 
 
 
 ```{r echo=F, fig.height=4, fig.width=5}
-#topstates <- c('South Dakota',as.character(Cases.top.10[1:5]))
 topstates <- c('New York', 'Indiana', 'California', 'Oregon', 'Arizona')
 g <- cvdata.us.by_state %>% 
   filter(State %in%  topstates) %>%
@@ -260,29 +255,6 @@ cvdata.us.by_state %>%
 
 ```
 
-## Georgia
-
-
-```{r echo=F, fig.height=4, fig.width=5}
-cvdata.ga <- filter(cvdata.us.by_state, State.Code == 'GA')
-
-
-g <- ggplot(cvdata.ga) +
-  aes(Date, Cases.Diff5) +
-  geom_line(color='blue') + 
-  geom_text(aes(label=round(Cases.Diff5)), color='black', nudge_y=3) +
-  geom_smooth(alpha=0.1, method='lm', color='blue', fill='blue', formula= y ~ poly(x,4), fullrange=T, span=0.2, size=0.5, linetype=3) +
-  ggtitle('Georgia Change in Confirmed Cases, Five Day Average',
-          subtitle = str_c("Reported data through ", format(max(cvdata.us$Date), "%B %d, %Y"))) +
-  ylab("Daily Increase") +
-  geom_text(data=~ tail(.x, 1), aes(y=Deaths, label=Deaths), color='red', size=8, nudge_y=4, show.legend = T) +
-  xlab(NULL)  +
-  geom_line(aes(y=Deaths), color='red') +
-  coord_cartesian(xlim=c(ymd('2020-03-15'), end_date)) +
-  scale_x_date(breaks=date.breaks, date_labels = '%m/%d', date_minor_breaks='1 day')
-g
-
-```
 
 ## State Summary
 
@@ -342,6 +314,7 @@ state.summary.g <- function(state.code='OR', overlay='Deaths') {
 state.summary.g('NJ')
 state.summary.g('NY')
 state.summary.g('TX')
+state.summary.g('GA')
 ```
 
 ## Oregon
@@ -426,6 +399,31 @@ cvdata.us.by_state %>%
   ggtitle('Deaths Per 100K, by Region')
 ```
 
+### Infection Rate by Governor's Party
+
+```{r fig.width=5}
+cvdata.us.by_state %>% 
+  filter(Date == end_date) %>%
+  ggplot() +
+  aes(x=gov.party, y=Deaths.Per100K, fill=gov.party) +
+  scale_fill_manual(values=c('R'='red', 'D'='blue')) +
+  geom_boxplot() +
+  xlab('Party') +
+  ggtitle('Deaths Per 100K, by Party')
+```
+### Current Infection Growth Rate by Governor's Party
+
+```{r fig.width=5}
+cvdata.us.by_state %>% 
+  filter(Date == end_date) %>%
+  ggplot() + 
+  aes(x=gov.party, y=Cases.Growth5, fill=gov.party) +
+  scale_fill_manual(values=c('R'='red', 'D'='blue')) +
+  geom_boxplot() +
+  scale_y_continuous(labels=percent) +
+  xlab('Party') +
+  ggtitle('Growth in Cases, by Party')
+```
 
 ### Report on Lake Placid
 

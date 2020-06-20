@@ -10,10 +10,10 @@ library(tidyr)
 scrape_state_orders = function() {
   url <- 'https://www.washingtonpost.com/graphics/2020/national/states-reopening-coronavirus-map/?itid=lk_inline_manual_3&itid=lk_inline_manual_3&tid=lk_inline_manual_3&tid=lk_inline_manual_3'
   
-  # So I need to load that page with chrome and then save it as a complete web page, `wapo.hmtl`.
+  # So I need to load that page with chrome and then save it as a complete web page, `data/wapo.hmtl`.
   
   states <- 
-    read_html(file("wapo.html"), encoding="text/html", 
+    read_html(file("data/wapo.html"), encoding="text/html", 
               config=list(httr::user_agent("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_4) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/83.0.4103.61 Safari/537.36"))) %>%
     html_nodes("div.state-container")
   
@@ -48,7 +48,7 @@ scrape_state_orders = function() {
     gov <- html_node(state, "h3 + div > span ") %>% html_text() %>% str_match("Governor: (.*) \\((.)\\)")
     gov.name <- gov[1,2]
     gov.party <- gov[1,3]
-    status <- html_node(state, "span.highlight") %>% html_text()
+    status <- html_node(state, "span.highlight") %>% html_text() %>% str_trim()
     open.detail <- NA
     closed.detail <- NA
     for (item in html_nodes(state, "li")) {
