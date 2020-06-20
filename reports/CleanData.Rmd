@@ -181,7 +181,15 @@ Start combining tables with external data.  Also invokes `calculate_differential
 Join in information on the status of states.  Information scraped from a Washington Post article on the status of each state.
 
 ```{r}
-states.summary <- readRDS('../data/states.status.RDS')
+states.summary <- readRDS('../data/states.status.RDS') %>%
+  mutate(status = factor(status,
+                         levels=c('No restrictions', 
+                                  'Minor restrictions vary by region', 
+                                  'Minor restrictions', 
+                                  'Moderate restrictions vary by region', 
+                                  'Moderate restrictions', 
+                                  'Major restrictions vary by region', 
+                                  'Major restrictions')))
 ```
 
 The cases and deaths data provided for the five counties of New York City is aggregated into a single entity called "New York City" with no FIPS.

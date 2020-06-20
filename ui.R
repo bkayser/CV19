@@ -6,6 +6,7 @@ source('utils/labels.R')
 variable_choices <- cvdata.cols[cvdata.cols != 'Cases.Diff5']
 
 shinyUI(fluidPage(title="COVID-19 Data Console",
+                  theme="bootstrap.css",
     # Application title
     titlePanel("Exploring COVID-19 Data"),
     tabsetPanel(
@@ -29,7 +30,8 @@ shinyUI(fluidPage(title="COVID-19 Data Console",
                  ),
                  # Show a plot of the generated distribution
                  mainPanel(width=9,
-                   plotOutput("detail_charts", width="100%", height="800px"))
+                           plotOutput("detail_charts", width="100%", height="800px"),
+                           htmlOutput('state_status'))
                )),
       tabPanel("State Comparisons",
                sidebarLayout(

@@ -7,6 +7,7 @@ source('utils/labels.R')
 
 cvdata.us.by_state <- readRDS('data/cvdata.us.by_state.RDS') 
 state.orders <- readRDS('data/orders.events.RDS')
+state.details <- readRDS('data/states.status.RDS')
 
 theme.default <- 
   theme_tufte() + 
@@ -96,6 +97,28 @@ shinyServer(function(input, output) {
       ylab(NULL) +
       xlab(NULL)
   })
+  output$state_status <- renderUI({
+    if (input$combined) {
+      tag("p", "All 50 states with some shutdown orders.")
+    } else {
+      details <- filter(state.details, State == input$state)
+      
+      tag("dl",
+          list(class="state_details",
+               tag("dt", "Governor"),
+               tag("dd", details$gov.name),
+               tag("dt", "Party"),
+               tag("dd", list(details$gov.party, class=details$gov.party)),
+               tag("dt", "Current Status"),
+               tag("dd", details$status),
+               tag("dt", "Still Open"),
+               tag("dd", details$still_open),
+               tag("dt", "Still Closed"),
+               tag("dd", details$still_closed)))
+          
+    }
+  })
+  
   
   output$detail_charts <- renderPlot({
     show.all <- input$combined
