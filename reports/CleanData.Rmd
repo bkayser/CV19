@@ -223,6 +223,8 @@ populations[populations$Country == 'United States', 'Country'] = 'US'
 populations[populations$Country == 'Russian Federation', 'Country'] = 'Russia'
 populations[populations$Country == 'Iran, Islamic Rep.', 'Country'] = 'Iran'
 populations[populations$Country == 'Taiwan*', 'Country'] = 'Taiwan'
+populations[populations$Country == 'Czech Republic', 'Country'] = 'Czechia'
+populations[populations$Country == 'Slovak Republic', 'Country'] = 'Slovakia'
 populations[nrow(populations)+1, ] <- list('China, Hubei', 58.5e6) # 2015 National bureau of stats, China
 
 cvdata.i18n <- 
@@ -238,6 +240,65 @@ cvdata.i18n <-
 rm(populations, countries.cases, countries.recovered, countries.deaths)
 ```
 
+### Derive EU Data
+
+```{r}
+eu.countries <- c("Austria",
+                  "Belgium",
+                  "Bulgaria",
+                  "Croatia",
+                  "Cyprus",
+                  "Czechia",
+                  "Denmark",
+                  "Estonia",
+                  "Finland",
+                  "France",
+                  "Germany",
+                  "Greece",
+                  "Hungary",
+                  "Ireland",
+                  "Italy",
+                  "Latvia",
+                  "Lithuania",
+                  "Luxembourg",
+                  "Malta",
+                  "Netherlands",
+                  "Poland",
+                  "Portugal",
+                  "Romania",
+                  "Slovakia",
+                  "Slovenia",
+                  "Spain",
+                  "Sweden")
+
+cvdata.i18n$EU <- cvdata.i18n$Country %in% eu.countries
+
+
+cvdata.i18n.plusEU <- cvdata.i18n %>%
+  filter(EU) %>%
+  group_by(Date) %>%
+  summarize(Cases = sum(Cases),
+            key = "EU",
+            Lat = mean(Lat),
+            Long = mean(Long),
+            Country = "European Union",
+            Population = sum(Population),
+            Cases.Diff = sum(Cases.Diff),
+            Cases.Diff5 = sum(Cases.Diff5),
+            Deaths.Diff5 = sum(Deaths.Diff5),
+            Deaths = sum(Deaths),
+            Recovered = sum(Recovered),
+            Est.Recovered = sum(Est.Recovered),
+            Deaths.Growth5 = Deaths.Diff5 / Deaths,
+            Cases.Growth5 = Cases.Diff5 / Cases,
+            Cases.Diff5.Per100K = Cases.Diff5 * 100000 / Population,
+            Cases.Per100K = Cases * 100000 / Population,
+            Deaths.Diff5.Per100K = Deaths.Diff5 * 100000 / Population,
+            Deaths.Per100K = Deaths * 100000 / Population) %>%
+  bind_rows(cvdata.i18n)
+rm(cvdata.i18n)
+rm(eu.countries)
+```
 
 ### Derive Additional Tables
 
@@ -263,8 +324,11 @@ cvdata.us.by_state <- cvdata.us %>%
          Infection.Rate = Cases.Diff * 1000000 / Population,
          Death.Rate = Deaths.Diff * 1000000 / Population,
          total = positive + negative,
-         Testing.Rate = total / Population,
-         Testing.Positive.Rate = positive / total) %>%
+         Testing.Rate.Total = total / Population,
+         Testing.Positive.Rate.Total = positive / total) %>%
+  calculate_differentials(c('total', 'positive', 'negative'), growth=F) %>%
+  mutate(Testing.Rate.Weekly = 7 * total.Diff5 / Population,
+         Testing.Positive.Rate = positive.Diff5 / total.Diff5) %>%
   add_estimated_recoveries() %>%
   left_join(states.summary, by=c('State', 'State.Code')) %>%
   select(Key, State, State.Code, Region, Division, Date, starts_with('Cases'), starts_with('Deaths'), contains('Recovered'), matches('^[A-Z]', ignore.case=F), -FIPS, everything())
@@ -322,7 +386,7 @@ gather(cvdata.us.by_state, key='Measure', value='Recoveries', 'Recovered', 'Est.
 
 ```{r fig.width=6, fig.height=5}
 
-gather(cvdata.i18n, key='Measure', value='Recoveries', 'Recovered', 'Est.Recovered', 'Cases') %>%
+gather(cvdata.i18n.plusEU, key='Measure', value='Recoveries', 'Recovered', 'Est.Recovered', 'Cases') %>%
   filter(Recoveries > 0 & Country %in% c('Australia', 'Hubei - China', 'France', 'Italy', 'Spain', 'US', 'Germany', 'Austria', 'Russia', 'Korea, South')) %>%
 ggplot() +
   aes(x=Date, y=Recoveries, linetype=Measure, color=Country)+
@@ -339,6 +403,6 @@ ggplot() +
 ```{r echo=T}
 saveRDS(cvdata.us, '../data/cvdata.us.RDS')
 saveRDS(cvdata.us.by_state, '../data/cvdata.us.by_state.RDS')
-saveRDS(cvdata.i18n, '../data/cvdata.i18n.RDS')
+saveRDS(cvdata.i18n.plusEU, '../data/cvdata.i18n.RDS')
 ```
 

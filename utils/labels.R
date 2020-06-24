@@ -7,8 +7,10 @@ cvdata.cols <- c('Cases' = 'Cases',
                  'Daily New Deaths' = 'Deaths.Diff',
                  'New Deaths, 5 Day Avg' = 'Deaths.Diff5',
                  'Growth in Deaths' = 'Deaths.Growth5',
-                 'Testing Rate' = 'Testing.Rate',
+                 'Weekly Testing Rate' = 'Testing.Rate.Weekly',
                  'Positive Test Rate' = 'Testing.Positive.Rate',
+                 'Cumulative Test Rate' = 'Testing.Rate.Total',
+                 'Cumulative Positive Rate' = 'Testing.Positive.Rate.Total',
                  'Population In ICU' = 'inIcuCurrently')
 
 states <- c("Alabama", "Alaska", "Arizona", "Arkansas", "California", "Colorado", "Connecticut", "Delaware", 

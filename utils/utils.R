@@ -50,7 +50,7 @@ read_and_clean <- function(infile) {
   return(cv.wide)
 }
 
-calculate_differentials <- function(data, target_variables) {
+calculate_differentials <- function(data, target_variables, growth=T) {
   infection_data <- arrange(data, Key, Date)
   boundaries <- which(infection_data$Key[2:nrow(infection_data)] != infection_data$Key[1:nrow(infection_data)-1])
   target_variables.diff <- paste0(target_variables, '.Diff')
@@ -72,51 +72,22 @@ calculate_differentials <- function(data, target_variables) {
                    boundaries + 4, 
                    boundaries + 5), target_variables.diff5] <- 0
 
-  for (var in 1:length(target_variables)) {
-    target_var <- target_variables[var]
-    target_var.diff5 <- target_variables.diff5[var]
-    growth_var <- paste0(target_var, '.Growth5')
-    rate_var <- paste0(target_var, '.Diff5.Per100K')
-    per_capita_var <- paste0(target_var, '.Per100K')
-    growth_rows <- (infection_data[,target_var.diff5] != 0 & infection_data[,target_var] != 0)[,1]
-    infection_data[growth_rows, growth_var]     <- round(infection_data[growth_rows, target_var.diff5] / infection_data[growth_rows, target_var], 4)
-    infection_data[growth_rows, rate_var]       <- infection_data[growth_rows, target_var.diff5] * 100000 / infection_data$Population[growth_rows]
-    infection_data[, per_capita_var] <- round(signif(infection_data[, target_var] * 100000 / infection_data$Population, 3))
-    infection_data[!growth_rows, c(growth_var, rate_var) ] <- list(0,0)
+  if (growth) {
+    for (var in 1:length(target_variables)) {
+      target_var <- target_variables[var]
+      target_var.diff5 <- target_variables.diff5[var]
+      growth_var <- paste0(target_var, '.Growth5')
+      rate_var <- paste0(target_var, '.Diff5.Per100K')
+      per_capita_var <- paste0(target_var, '.Per100K')
+      growth_rows <- (infection_data[,target_var.diff5] != 0 & infection_data[,target_var] != 0 & !is.na(infection_data[,target_var.diff5]))[,1]
+      infection_data[growth_rows, growth_var]     <- round(infection_data[growth_rows, target_var.diff5] / infection_data[growth_rows, target_var], 4)
+      infection_data[growth_rows, rate_var]       <- infection_data[growth_rows, target_var.diff5] * 100000 / infection_data$Population[growth_rows]
+      infection_data[, per_capita_var] <- round(signif(infection_data[, target_var] * 100000 / infection_data$Population, 3))
+      infection_data[!growth_rows, c(growth_var, rate_var) ] <- list(0,0)
+    }
   }
   return(infection_data)
 }
-
-# 
-# data <- 
-#   list(tibble(Key = 'toyota',
-#               Date = seq(today(), by = -1, length.out = 50),
-#               ColA = 1:50,
-#               Population = 100,
-#               ColB = seq(24, -25, by=-1),
-#               ColC = rnorm(50, mean=25, sd=10)),
-#        tibble(Key = 'ford',
-#               Date = seq(today(), by = -1, length.out = 50),
-#               ColA = 50:99,
-#               Population = 1000,              
-#               ColB = seq(-20, by=2, length.out=50),
-#               ColC = rnorm(50, mean=50, sd=5) + seq(50, by=10, length.out=50)),
-#        tibble(Key = 'GM', 
-#               Date = seq(today(), by = -1, length.out = 50),
-#               Population = 100,
-#               ColA = 1:50,
-#               ColB = seq(0, by=7, length.out=50),
-#               ColC = runif(50, 10, 90))) %>% bind_rows()
-# 
-# target_variables <- c('ColA','ColB', 'ColC')
-# calculate_differentials(data, target_variables) %>%
-# ggplot() +
-#   aes(color=Key, x=Date) +
-#   geom_line(aes(y=ColC.Diff), linetype=1) +
-#   geom_line(aes(y=ColC.Diff5), linetype=3) +
-#   facet_grid(rows=vars(Key), scales='free')
-# 
-
 
 
 add_estimated_recoveries <- function(data) {
@@ -167,3 +138,166 @@ get_geographic_data <- function() {
   
 }
 
+filter_cvdata <- function(data, states, show.all=F) {
+  if (!show.all | length(states) == 0) {
+    data %>%
+      filter(State %in% states) %>%
+      mutate(State=fct_drop(State)) %>%
+      arrange(State, Date) %>%
+      filter( Cases > 0)
+  } else {
+    data %>%
+      group_by(Date) %>%
+      summarize(Population = sum(Population),
+                Cases = sum(Cases),
+                Cases.Per100K = Cases * 100000 / Population,
+                Cases.Diff5 = sum(Cases.Diff5),
+                Cases.Diff = sum(Cases.Diff),
+                Cases.Growth5 = Cases.Diff5 / Cases,
+                
+                Deaths = sum(Deaths, na.rm=T),
+                Deaths.Per100K = Deaths * 100000 / Population,
+                Deaths.Diff = sum(Deaths.Diff),
+                Deaths.Diff5 = sum(Deaths.Diff5, na.rm=T),
+                Deaths.Growth5 = Deaths.Diff5 / Deaths,
+                
+                Testing.Rate.Total = sum(total / Population),
+                Testing.Positive.Rate.Total = sum(positive) / sum(total),
+                Testing.Rate.Weekly = sum(total.Diff5) / Population,
+                Testing.Positive.Rate.Weekly = sum(positive.Diff5) / sum(total.Diff5),
+                inIcuCurrently = sum(inIcuCurrently, na.rm=T))
+  }
+}
+
+party_fill <- function() {
+  scale_fill_manual(values = c('D' = '#6666FF', 'R'='#FF6666'), na.value='#BBBBBB')
+}
+
+state_summary_plot = function(data, 
+                              state, 
+                              overlay='Deaths.Diff5', 
+                              show.all=F, 
+                              show.lockdown=T,
+                              show.trend=T){
+  start_date <- mdy('02/26/2020')
+  end_date <- max(data$Date)
+  
+  state.data <- filter_cvdata(data, state, show.all) %>% 
+    filter(Cases > 0 & Date > start_date) %>%
+    mutate(Daily.Increase=round(Cases.Diff5))
+  if (show.all) {
+    name <- 'All States'
+    orders <- state.orders
+  } else {
+    name <- state
+    orders <- filter(state.orders, State==name) 
+  } 
+  start_date.adj <- max(start_date, min(state.data$Date))
+  
+  date.breaks <- seq(end_date,
+                     start_date.adj,
+                     by="-1 week") %>% rev()
+  last.recorded.value <- tail(state.data, 1) %>% pull(overlay)
+  # scale the overlay so it fits in the graph
+  if (overlay == 'Cases.Diff') {
+    scale.factor <- 1
+  } else {
+    scale.factor <- 1.1 * max(state.data$Cases.Diff5, na.rm=T) / max(state.data[overlay], na.rm=T)
+  }
+  state.data$Overlay <- unlist(state.data[overlay]) * scale.factor
+  overlay.label <- names(cvdata.cols)[cvdata.cols == overlay]
+  overlay.format <- ifelse(str_ends(overlay, 'Growth5') | str_detect(overlay, 'Rate'), percent, comma)
+  
+  g <- ggplot(state.data) +
+    aes(x=Date, y=Cases.Diff5) +
+    geom_line(color='#999999') + 
+    geom_text(aes(label=Daily.Increase), 
+              nudge_y=4,
+              check_overlap=T,
+              color='black') +
+    ggtitle(paste(name, 'Change in Confirmed Cases, Five Day Average'),
+            subtitle = str_c("Reported data through ", format(max(cvdata.us.by_state$Date), "%B %d, %Y"))) +
+    ylab("Daily Increase") +
+    geom_text(data=~ tail(.x, 1), 
+              aes(label=paste0(overlay.label, ': ',overlay.format(last.recorded.value))),
+              y=last.recorded.value * scale.factor,
+              color='red',
+              size=6,
+              nudge_y=0.1 * last.recorded.value * scale.factor,
+              nudge_x=-12,
+              show.legend = F) +
+    theme_few() + 
+    theme(text = element_text(size=14),
+          title = element_text(size=18),
+          legend.position='bottom',
+          legend.key.size=unit(22, 'point'),
+          legend.key.width = unit(8, 'point'),
+          legend.text=element_text(size=14,lineheight = 12),
+          legend.spacing=unit(12,'points')) +
+    xlab(NULL)  +
+    scale_x_date(breaks=date.breaks, date_labels = '%m/%d', date_minor_breaks='1 day')
+  
+  if (scale.factor != 1) {
+    g <- g + scale_y_continuous(name='Daily Increase', 
+                                sec.axis = sec_axis(trans = ~./scale.factor, 
+                                                    name = overlay.label,
+                                                    labels = overlay.format)) 
+  } else {
+    g <- g + scale_y_continuous(name='Daily Increase') 
+  }
+  
+  if (str_ends(overlay, "5" )) {
+    g <- g + geom_line(aes(y=Overlay), color='#FF3333', alpha=0.6) 
+  } else {
+    g <- g + geom_bar(aes(y=Overlay), 
+                      fill='#FF3333', alpha=0.1, stat='identity')      
+  }
+  if (show.lockdown) {
+    if (any(orders$type == 'close')) {
+      lockdown.range <- filter(state.data, Date >= min(orders$date))
+      if (any(orders$type == 'open')) {
+        lockdown.range <- filter(lockdown.range, Date <= max(orders$date))
+      }
+    } else {
+      lockdown.range <- head(state.data, 0)
+    }
+    g <- g + 
+      geom_vline(data=orders,
+                 aes(xintercept=date, color=type, alpha='0'),
+                 size=1, 
+                 show.legend = T) +
+      scale_alpha_manual(values=0, guide=F) +
+      geom_area(data=lockdown.range,
+                #aes(ymax=Cases.Diff5),
+                fill='#aec0c6',
+                alpha=0.2) 
+    if (show.all) {
+      g <- g +
+        geom_vline(data=orders,
+                   aes(xintercept=date, color=type),
+                   alpha=0.5,
+                   size=0.5, 
+                   show.legend = F) +
+        scale_color_manual(name=NULL, 
+                           values=c(close='#3333CC', open='#DD6666'),
+                           labels=c('Restrictions put in place',
+                                    'Restrictions lifted')) 
+    } else {
+      g <- g +
+        geom_vline(data=orders,
+                   aes(xintercept=date, color=type),
+                   alpha=0.5,
+                   linetype=2,
+                   size=0.5, 
+                   show.legend = F) +
+        scale_color_manual(name=NULL, 
+                           values=c(close='#3333CC', open='#DD6666'),
+                           labels=paste(orders$desc, format(orders$date, '%B %d'))) 
+    }
+    
+  }
+  if (show.trend) {
+    g <- g + geom_smooth(alpha=0.05, method='loess', color='black', fill='green', fullrange=T, span=0.5, size=0.5, linetype=3) 
+  }
+  g
+}

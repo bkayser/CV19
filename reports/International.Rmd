@@ -21,7 +21,8 @@ library(scales)
 library(caTools)
 source('../utils/utils.R')
 knitr::opts_chunk$set(echo=F)
-# old_theme <- theme_set(ggthemes::theme_fivethirtyeight())
+#old_theme <- theme_set(ggthemes::theme_fivethirtyeight())
+old_theme <- theme_set(ggthemes::theme_few())
 
 
 ```
@@ -222,6 +223,47 @@ g + aes(y=Cases) +
 g + aes(y=Deaths.Per100K) + 
   ylab("Deaths Per 100K Population") +
   scale_y_continuous(labels=comma) 
-rm(d0,d1,d2, labels)
+rm(d0,d1,d2, labels, g)
 ```
 
+### EU vs USA
+
+
+```{r}
+cvdata.i18n.plusEU %>%
+  filter(Country %in% c('US', 'European Union')) %>%
+  ggplot() +
+  aes(x=Date, color=Country) +
+  geom_line(aes(y=Deaths.Diff5)) +
+  xlab(NULL) +
+  ylab("Daily Increase, 5 Day Average") +
+  theme(legend.position = c(0.2, 0.8),
+        legend.title = element_blank()) +
+  ggtitle("Comparison of Deaths Between EU and US",
+          subtitle="Data from Johns Hopkins University Covid19 Repository")
+```
+
+```{r}
+cvdata.i18n.plusEU %>%
+  filter(Country %in% c('US', 'European Union')) %>%
+  ggplot() +
+  aes(x=Date, color=Country) +
+  geom_line(aes(y=Deaths.Diff5)) +
+  xlab(NULL) +
+  ylab("Daily Increase, 5 Day Average") +
+  theme(legend.position = c(0.2, 0.8)) +
+  ggtitle("Comparison of Deaths between EU and US",
+          subtitle="Data from Johns Hopkins University Covid19 Repository")
+```
+```{r}
+cvdata.i18n.plusEU %>%
+  filter(Country %in% c('US', 'European Union')) %>%
+  ggplot() +
+  aes(x=Date, color=Country) +
+  geom_line(aes(y=Cases.Diff5.Per100K)) +
+  xlab(NULL) +
+  ylab("Daily Increase, 5 Day Average") +
+  theme(legend.position = c(0.2, 0.8)) +
+  ggtitle("Comparison of Cases per Capita Between EU and US",
+          subtitle="Data from Johns Hopkins University Covid19 Repository")
+```
