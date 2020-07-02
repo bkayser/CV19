@@ -4,14 +4,17 @@ library(lubridate)
 library(scales)
 library(ggthemes)
 source('utils/labels.R')
+source('utils/utils.R')
 
-cvdata.us.by_state <- readRDS('data/cvdata.us.by_state.RDS') 
-state.orders <- readRDS('data/orders.events.RDS')
-state.details <- readRDS('data/states.status.RDS')
 
 # Define server logic required to draw the metric plots
 shinyServer(function(input, output) {
 
+  cvdata.us.by_state <- readRDS('data/cvdata.us.by_state.RDS') 
+  state.details <- readRDS('data/states.status.RDS')
+  state.orders <- readRDS('data/orders.events.RDS')
+  theme.default <- ggthemes::theme_few()
+  
   data <- function(states, show.all=F) {
     filter_cvdata(cvdata.us.by_state, states, show.all)
   }
@@ -28,7 +31,7 @@ shinyServer(function(input, output) {
     value.label <- names(cvdata.cols)[cvdata.cols == input$content]
     
     start_date.adj <- mdy('03-14-2020')
-    breaks <- seq(end_date(),
+    breaks <- seq(end_date,
                   start_date.adj,
                   by="-1 week") %>% rev()
     if (breaks[1] != start_date.adj) {
@@ -38,7 +41,7 @@ shinyServer(function(input, output) {
     g <- ggplot(df) +
       geom_line() + 
       ggtitle(str_c(value.label, ifelse(show.all, ', All States', ', by State'))) +
-      coord_cartesian(xlim=c(start_date.adj, end_date())) +
+      coord_cartesian(xlim=c(start_date.adj, end_date)) +
       scale_x_date(breaks=breaks, date_labels = '%m/%d', date_minor_breaks='1 day') +
       theme.default +
       theme(legend.position=c(0.1, 0.9)) 
@@ -90,11 +93,12 @@ shinyServer(function(input, output) {
   
   output$detail_charts <- renderPlot({
     state_summary_plot(cvdata.us.by_state,
-                       input$combined,
-                       input$state,
-                       input$overlay,
-                       input$show_lockdown,
-                       input$show_trend)
+                       state=input$state,
+                       state.orders=state.orders,
+                       overlay=input$overlay,
+                       show.all=input$combined,
+                       show.lockdown=input$show_lockdown,
+                       show.trend=input$show_trend)
   })
 })
 

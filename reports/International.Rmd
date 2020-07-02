@@ -230,21 +230,21 @@ rm(d0,d1,d2, labels, g)
 
 
 ```{r}
-cvdata.i18n.plusEU %>%
+cvdata.i18n %>%
   filter(Country %in% c('US', 'European Union')) %>%
   ggplot() +
   aes(x=Date, color=Country) +
-  geom_line(aes(y=Deaths.Diff5)) +
+  geom_line(aes(y=Cases.Diff5)) +
   xlab(NULL) +
   ylab("Daily Increase, 5 Day Average") +
   theme(legend.position = c(0.2, 0.8),
         legend.title = element_blank()) +
-  ggtitle("Comparison of Deaths Between EU and US",
+  ggtitle("Comparison of Cases Between EU and US",
           subtitle="Data from Johns Hopkins University Covid19 Repository")
 ```
 
 ```{r}
-cvdata.i18n.plusEU %>%
+cvdata.i18n %>%
   filter(Country %in% c('US', 'European Union')) %>%
   ggplot() +
   aes(x=Date, color=Country) +
@@ -256,7 +256,7 @@ cvdata.i18n.plusEU %>%
           subtitle="Data from Johns Hopkins University Covid19 Repository")
 ```
 ```{r}
-cvdata.i18n.plusEU %>%
+cvdata.i18n %>%
   filter(Country %in% c('US', 'European Union')) %>%
   ggplot() +
   aes(x=Date, color=Country) +

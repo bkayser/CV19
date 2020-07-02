@@ -12,7 +12,6 @@ rsconnect::deployApp(appDir = "~/Projects/Covid19",
                      account = "surprise", 
                      server = "shinyapps.io", 
                      appName = "COVID19Demo",      
-                  #   appId = 2054587, 
                      lint = FALSE,
                      metadata = list(asMultiple = FALSE, asStatic = FALSE,ignoredFiles = "_app.R|.gitmodules|.RData|CleanData.nb.html|CleanData.pdf|CleanData.Rmd|LICENSE|README.md"),     
                      logLevel = "verbose") 

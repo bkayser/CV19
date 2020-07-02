@@ -21,6 +21,7 @@ Initialize the Notebook loading the following required libraries.
 library(tidyverse)
 library(scales)
 old_theme <- theme_set(theme_light())
+
 source('../utils/utils.R')
 ```
 
@@ -314,14 +315,11 @@ cvdata.us.by_state <- cvdata.us %>%
             Long = last(Long))%>%
   ungroup(State, Date) %>%
   left_join(states, by=c('State')) %>%
-  mutate(State = as.factor(State)) %>%
   filter(!is.na(Region)) %>%
   left_join(covid.testing, by=c('State.Code', 'Date')) %>%
   select(-hash, -dateChecked, -fips, -CTYNAME) %>% 
   calculate_differentials(c('Cases', 'Deaths')) %>%
-  mutate(State.Code = fct_inorder(as.factor(State.Code)),
-         State = fct_inorder(as.factor(State)),
-         Infection.Rate = Cases.Diff * 1000000 / Population,
+  mutate(Infection.Rate = Cases.Diff * 1000000 / Population,
          Death.Rate = Deaths.Diff * 1000000 / Population,
          total = positive + negative,
          Testing.Rate.Total = total / Population,
@@ -331,8 +329,12 @@ cvdata.us.by_state <- cvdata.us %>%
          Testing.Positive.Rate = positive.Diff5 / total.Diff5) %>%
   add_estimated_recoveries() %>%
   left_join(states.summary, by=c('State', 'State.Code')) %>%
+  mutate(State.Code = fct_inorder(as.factor(State.Code)),
+         State = fct_inorder(State)) %>%
   select(Key, State, State.Code, Region, Division, Date, starts_with('Cases'), starts_with('Deaths'), contains('Recovered'), matches('^[A-Z]', ignore.case=F), -FIPS, everything())
-rm(states)
+
+rm(states) 
+  
 
 ```
 

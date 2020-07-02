@@ -1,8 +1,5 @@
 library(tidyverse)
 library(lubridate)
-#library(scales)
-#library(wpp2019)
-
 
 read_and_clean <- function(infile) {
   # Read the data
@@ -164,7 +161,7 @@ filter_cvdata <- function(data, states, show.all=F) {
                 Testing.Rate.Total = sum(total / Population),
                 Testing.Positive.Rate.Total = sum(positive) / sum(total),
                 Testing.Rate.Weekly = sum(total.Diff5) / Population,
-                Testing.Positive.Rate.Weekly = sum(positive.Diff5) / sum(total.Diff5),
+                Testing.Positive.Rate = sum(positive.Diff5) / sum(total.Diff5),
                 inIcuCurrently = sum(inIcuCurrently, na.rm=T))
   }
 }
@@ -175,6 +172,7 @@ party_fill <- function() {
 
 state_summary_plot = function(data, 
                               state, 
+                              state.orders,
                               overlay='Deaths.Diff5', 
                               show.all=F, 
                               show.lockdown=T,
@@ -216,7 +214,7 @@ state_summary_plot = function(data,
               check_overlap=T,
               color='black') +
     ggtitle(paste(name, 'Change in Confirmed Cases, Five Day Average'),
-            subtitle = str_c("Reported data through ", format(max(cvdata.us.by_state$Date), "%B %d, %Y"))) +
+            subtitle = str_c("Reported data through ", format(end_date, "%B %d, %Y"))) +
     ylab("Daily Increase") +
     geom_text(data=~ tail(.x, 1), 
               aes(label=paste0(overlay.label, ': ',overlay.format(last.recorded.value))),
@@ -226,7 +224,7 @@ state_summary_plot = function(data,
               nudge_y=0.1 * last.recorded.value * scale.factor,
               nudge_x=-12,
               show.legend = F) +
-    theme_few() + 
+    ggthemes::theme_few() + 
     theme(text = element_text(size=14),
           title = element_text(size=18),
           legend.position='bottom',

@@ -19,9 +19,11 @@ echo: TRUE
 library(tidyverse)
 library(scales)
 library(caTools)
+
+source('../utils/labels.R')
 source('../utils/utils.R')
 knitr::opts_chunk$set(echo=F)
-#old_theme <- theme_set(theme_fivethirtyeight())
+old_theme <- theme_set(ggthemes::theme_few())
 
 ```
 
@@ -42,7 +44,6 @@ knitr::opts_chunk$set(echo=F)
 cvdata.us <- readRDS('../data/cvdata.us.RDS')
 cvdata.us.by_state <- readRDS('../data/cvdata.us.by_state.RDS')
 state.orders <- readRDS('../data/orders.events.RDS')
-
 
 # Let's first set up some parameters for the graph's X axis.
 
@@ -258,17 +259,27 @@ cvdata.us.by_state %>%
 
 
 ```{r echo=F, fig.height=4, fig.width=5}
- state_summary_plot(cvdata.us.by_state, state = 'New York')
- state_summary_plot(cvdata.us.by_state, state = 'Arizona')
- state_summary_plot(cvdata.us.by_state, state = 'California')
- state_summary_plot(cvdata.us.by_state, state = 'Texas')
+ state_summary_plot(cvdata.us.by_state, 
+                    state = 'New York',
+                    state.orders = state.orders)
+ state_summary_plot(cvdata.us.by_state, 
+                    state = 'Arizona',
+                    state.orders = state.orders)
+ state_summary_plot(cvdata.us.by_state, 
+                    state = 'California',
+                    state.orders = state.orders)
+ state_summary_plot(cvdata.us.by_state, 
+                    state = 'Texas',
+                    state.orders = state.orders)
 ```
 
 ## Oregon
 
 
 ```{r echo=F, fig.height=4, fig.width=5}
- state_summary_plot(cvdata.us.by_state, state = 'Oregon')
+ state_summary_plot(cvdata.us.by_state, 
+                    state = 'Oregon',
+                    state.orders = state.orders)
 ```
 
 ### Counties by Case Density
@@ -301,9 +312,10 @@ today <- filter(cvdata.us) %>%
 
 averages.by_state <- tapply(today$Cases.Per100K, today$State.Code, median) %>% sort() 
 ggplot(today) +
-  aes(x = fct_relevel(State.Code, names(averages.by_state)), y = Cases.Per100K, fill = Region) +
+  aes(x = fct_relevel(State.Code, names(averages.by_state)), y = Cases.Per100K, fill = gov.party) +
   geom_boxplot() +
   coord_flip(ylim=c(0,2000)) +
+    party_fill() +
   ggtitle("") +
   ggtitle('Cases Per Capita for Counties, State by State')
 
@@ -347,7 +359,7 @@ cvdata.us.by_state %>%
   ggplot() +
   aes(x=gov.party, y=Deaths.Per100K, fill=gov.party) +
   party_fill() +
-  geom_boxplot() +
+  geom_boxplot(show.legend=F) +
   xlab('Party') +
   ggtitle('Deaths Per 100K, by Party')
 ```
@@ -359,7 +371,7 @@ cvdata.us.by_state %>%
   ggplot() + 
   aes(x=gov.party, y=Cases.Growth5, fill=gov.party) +
   party_fill() +
-  geom_boxplot() +
+  geom_boxplot(show.legend = F) +
   scale_y_continuous(labels=percent) +
   xlab('Party') +
   ggtitle('Growth in Cases, by Party')
@@ -447,7 +459,7 @@ ggplot() +
   geom_smooth(method='lm', formula = y ~ x, color='red', size=0.5) +
   scale_y_log10(labels=comma) + 
   scale_x_log10() +
-  ggtitle('Confirmed Cases vs. Population Density, April 11, 2020',
+  ggtitle(paste0('Confirmed Cases vs. Population Density, as of ', format(end_date, "%D")),
           subtitle='Data in Log Scale') +
   xlab('Population per Mile') +
   ylab('Cases per 100K population')
@@ -470,6 +482,7 @@ testdata <- testdata.ts %>%
 ggplot(testdata) +
   aes(x=State.Code, y=Tests.Per.Capita, fill=gov.party) +
   geom_bar(stat='identity') +
+  party_fill() +
   scale_y_continuous(labels=comma, position='right') +
   ggtitle('Tests conducted per 100K population') +
   coord_flip() 
@@ -477,14 +490,14 @@ ggplot(testdata) +
 testdata$State = fct_reorder(testdata$State, testdata$Test.Positive.Rate)
 
 ggplot(testdata) +
-  aes(x=State, y=Test.Positive.Rate, fill=gov.party) +
+  aes(x=State, y=Testing.Positive.Rate, fill=gov.party) +
   party_fill() +
   geom_bar(stat='identity') +
   scale_y_continuous(labels=percent, position='right') +
   coord_flip() + #ylim=c(0,0.25))  +
   theme(line = element_blank(), 
         panel.border = element_blank(),
-        axis.text.x = element_blank(),
+#        axis.text.x = element_blank(),
         legend.position=c(0.75,0.4))
 
 ```
@@ -506,11 +519,11 @@ history.1 <- split(history, history$State) %>%
   bind_rows() %>%
   filter(positiveRate < 0.55)  # Remove outliers
 
-filter(history.1, State %in% c('Washington', 'California', 'Arizona', 'Oregon')) %>%
+filter(history.1, State %in% c('New York', 'New Jersey', 'Massachusetts', 'Arizona', 'Texas', 'Georgia', 'South Carolina', 'Florida')) %>%
   ggplot() +
   aes(x=Tests.Per.Capita, y=positiveRate, color=State) +
   ggtitle(subtitle = paste0(window_width, ' day moving average over last ', timerange, ' days'),
-          paste0('Per Capita Testing vs. Test Positive Rate for West Coast States')) +
+          paste0('Per Capita Testing vs. Test Positive Rate')) +
   xlab('Tests per 100K Population') +
   ylab('Rate of Positive Tests') +
   geom_line(show.legend = F, size=0.2) +
@@ -520,9 +533,7 @@ filter(history.1, State %in% c('Washington', 'California', 'Arizona', 'Oregon'))
                                                           Date = last(Date),
                                                           positiveRate=last(positiveRate),
                                                           Tests.Per.Capita=last(Tests.Per.Capita)),
-             aes(label=State.Code), show.legend=F)  +
-  theme_stata()#+
-
+             aes(label=State.Code), show.legend=F)  
 
 filter(history.1, State %in% c('Oregon', 'New York', 'New Jersey', 'Massachusetts')) %>%
   ggplot() +
@@ -538,8 +549,7 @@ filter(history.1, State %in% c('Oregon', 'New York', 'New Jersey', 'Massachusett
                                                           Date = last(Date),
                                                           positiveRate=last(positiveRate),
                                                           Tests.Per.Capita=last(Tests.Per.Capita)),
-             aes(label=State.Code), show.legend=F)  +
-  theme_stata()#+
+             aes(label=State.Code), show.legend=F)  
 
 
 ```
