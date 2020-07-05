@@ -20,7 +20,7 @@ library(tidyverse)
 library(scales)
 library(knitr)
 theme_set(theme_light())
-source('utils.R')
+source('../utils/utils.R')
 knitr::opts_chunk$set(echo=F)
 ```
 
@@ -38,9 +38,9 @@ knitr::opts_chunk$set(echo=F)
 
 
 ```{r echo=T, include=F}
-cvdata.us <- readRDS('data/cvdata.us.RDS')
-cvdata.us.by_state <- readRDS('data/cvdata.us.by_state.RDS')
-cvdata.i18n <- readRDS('data/cvdata.i18n.RDS')
+cvdata.us <- readRDS('../data/cvdata.us.RDS')
+cvdata.us.by_state <- readRDS('../data/cvdata.us.by_state.RDS')
+cvdata.i18n <- readRDS('../data/cvdata.i18n.RDS')
 end_date <- max(cvdata.us$Date)
 ```
 
@@ -54,7 +54,7 @@ I did a lot of exploration to see if there were any variables that I could norma
 Confirmed Cases is the total number of confirmed cases since the start of the outbreak.  It does not take into account recoveries or deaths, and it never decreases.  The time series chart of Confirmed Cases looks like the following.
 
 ```{r fig.height=3}
-cvdata.i18n %>% filter(Country %in% c('Italy', 'China, Hubei', 'Korea, South', 'US', 'Spain')) %>%
+cvdata.i18n %>% filter(Country %in% c('Italy', 'China, Hubei', 'India', 'US', 'Brazil')) %>%
   ggplot() +
   aes(x=Date, y=Cases, color=Country) +
   geom_line() +
@@ -78,7 +78,7 @@ is that the growth rate seems to have peaked just about everywhere and is on the
 Here's what that chart looks like.
 
 ```{r fig.height=3, fig.width=5}
-cvdata.i18n %>% filter(Country %in% c('Italy', 'China, Hubei', 'Korea, South', 'US', 'Spain')) %>%
+cvdata.i18n %>% filter(Country %in% c('Italy', 'China, Hubei', 'India', 'US', 'Brazil')) %>%
   ggplot() +
   aes(x=Date, y=Cases.Growth5, color=Country) +
   geom_line() +
@@ -105,18 +105,19 @@ I believe these dates represent when things will be at their worst.  There will 
 
 # Step 0: Filter the left and right edge of the timeseries
 major_countries <- 
-  filter(cvdata.i18n, Cases > 100 & Country %in% c("China, Hubei", "Spain", "France", "Germany","Iran", 
+  filter(cvdata.i18n, Cases > 100 & Country %in% c("EU", "Brazil", "US","India", 
                                                    "Italy", "Korea, South", "United Kingdom", "US", 
-                                                   "Russia", "India", "South Africa", "Iceland", "Belgium", "Ireland", "San Marino", "Sweden",
+                                                   "Brazil", "India", "South Africa", "Iceland", "Belgium", "Ireland", "San Marino", "Sweden",
                                                    "Norway", "Denmark", "United Arab Emirates")) %>%
-  mutate(Country = fct_relevel(Country, "China, Hubei", "Korea, South", 'Spain', 'Italy', 'US')) %>%
+  mutate(Country = fct_relevel(Country, 'EU', 'Brazil', 'India', 'US')) %>%
   filter(!is.na(Population))
 
 peak_growth <- 
   semi_join(major_countries, 
             group_by(major_countries, Country) %>% summarize(Cases.Growth5 = max(Cases.Growth5)),
             by=c('Country', 'Cases.Growth5')) %>%
-  select(Country, Date)
+  select(Country, Date) %>%
+  mutate(Date = min(ymd("2020-05-01"), Date))
 
 start_dates <- peak_growth$Date
 names(start_dates) <- as.character(peak_growth$Country)
@@ -148,6 +149,7 @@ extrapolate.lm <- function(df) {
   t0 <- min(df$Date) 
   model <- tail(df, 20) %>%
     lm(formula = Cases.Growth5 ~ Day)
+  print(model)
   x_intercept <- ceiling(-model$coefficients[1]/model$coefficients[2])
   prediction <- tibble(Country = df$Country[1],
                        Day = 0:x_intercept)

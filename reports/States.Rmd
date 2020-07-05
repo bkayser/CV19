@@ -592,7 +592,7 @@ filter(cvdata.us, State == 'Arizona' & Cases.Per100K > 0.1) %>%
     linetype = County
   ) +
   geom_line(show.legend = F) +
-  coord_cartesian(xlim = c(mdy('03-24-2020'), date())) +
+  coord_cartesian(xlim = c(mdy('03-24-2020'), Sys.Date())) +
   geom_text(
     data = ~ filter(.x, Date == end_date),
     aes(x = Date, y = Cases.Per100K, label = County),
@@ -632,8 +632,9 @@ df <- filter(cvdata.us.by_state, Date == max(Date)) %>%
   arrange(desc(Long)) %>%
   mutate(col = ((row_number()-1) %% 9), 
          row = ((row_number()-1) %/% 9),
-         label_size = 0.05* pmax(Cases/Population, 0.002),
-         State.Code = fct_inorder(State.Code))
+         label_size = 0.05* pmax(Cases/Population, 0.002))
+         
+df$State.Code = fct_inorder(df$State.Code)
 
 g <- ggplot(df) +
   aes(x=col, y=5-row) +
