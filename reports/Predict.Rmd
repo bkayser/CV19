@@ -105,7 +105,7 @@ I believe these dates represent when things will be at their worst.  There will 
 
 # Step 0: Filter the left and right edge of the timeseries
 major_countries <- 
-  filter(cvdata.i18n, Cases > 100 & Country %in% c("EU", "Brazil", "US","India", 
+  filter(cvdata.i18n, Cases > 100 & Country %in% c("European Union", "Brazil", "US","India", "Canada",
                                                    "Italy", "Korea, South", "United Kingdom", "US", 
                                                    "Brazil", "India", "South Africa", "Iceland", "Belgium", "Ireland", "San Marino", "Sweden",
                                                    "Norway", "Denmark", "United Arab Emirates")) %>%
@@ -176,7 +176,7 @@ country_data <- lapply(countries.list, function(table) {
   t$Day <- 1:nrow(t)
   t
 }) %>% bind_rows()
-display_countries <-  c("Sweden", "Spain", "France", "Germany","Iran", "Italy", "Korea, South", "United Kingdom", "US")
+display_countries <-  c("European Union", "Brazil", "Canada", "US")
 prediction_data <- list(country_data=country_data, 
                       predictions.country=predictions.country, 
                       predictions.country.target_day=predictions.country.target_day)
@@ -185,16 +185,17 @@ filtered_data <- lapply(prediction_data, function(data) { filter(data, Country %
 
 ggplot(filtered_data[['country_data']]) +
   aes(x=Day, y=Cases.Growth5, color=Country) +
-  geom_line(show.legend = F) +
-  geom_line(data=filtered_data[['predictions.country']], color='black', size=0.5, linetype=3) +
+  geom_line(show.legend = T) +
+  #geom_line(data=filtered_data[['predictions.country']], color='black', size=0.5, linetype=3) +
   geom_vline(data=filtered_data[['predictions.country.target_day']], aes(xintercept = Day), color='darkgreen', size=0.5, alpha=0.5) +
   geom_label(data=filtered_data[['predictions.country.target_day']], aes(label = Label, x = Day), y = 0.25, color='darkgreen', size=3) +
   scale_y_continuous(labels=percent) +
-  facet_wrap('Country') +
+#  facet_wrap('Country', nrow=2) +
   theme(strip.text.x = element_text(face='bold', size=9)) +
   ggtitle(paste0("National Trends as of ",format(end_date, "%B %e, %Y")), subtitle="Plotted individually from the first day with more than 500 cases") +
   xlab("Days Since First 500 Cases") +
-  ylab("Daily Increase in Cases")
+  ylab("Daily Increase in Cases") +
+  scale_x_continuous(limits=c(0, 150)) 
   
 rm(filtered_data, country_data, major_countries, peak_growth, target_growth, start_dates, end_dates, countries.list, countries.pred_window,
    extrapolate.lm, predictions.country, predictions.country.target_day, display_countries)

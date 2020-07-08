@@ -228,7 +228,7 @@ rm(d0,d1,d2, labels, g)
 
 ```{r, fig.height=3, fig.width=4}
 compdata <- cvdata.i18n %>%
-  filter(Country %in% c('US', 'European Union', 'Brazil', 'India') &
+  filter(Country %in% c('US', 'European Union', 'Brazil', 'Canada') &
            Date > mdy('02/26/2020')) 
 
 compdata.last <- filter(compdata, Date == end_date)

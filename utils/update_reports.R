@@ -15,11 +15,12 @@ rsconnect::deployApp(appDir = "~/Projects/Covid19",
                      lint = FALSE,
                      metadata = list(asMultiple = FALSE, asStatic = FALSE,ignoredFiles = "_app.R|.gitmodules|.RData|CleanData.nb.html|CleanData.pdf|CleanData.Rmd|LICENSE|README.md"),     
                      logLevel = "verbose") 
+
 system("open https://surprise.shinyapps.io/COVID19Demo")
 
-#rmarkdown::render('Predict.Rmd')
-#system("open Predict.nb.html")
-rmarkdown::render('reports/International.Rmd')
 rmarkdown::render('reports/States.Rmd')
 system("open reports/States.nb.html")
+rmarkdown::render('reports/International.Rmd')
 system("open reports/International.nb.html")
+rmarkdown::render('reports/Predict.Rmd')
+system("open reports/Predict.nb.html")
