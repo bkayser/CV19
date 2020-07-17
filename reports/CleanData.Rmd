@@ -54,6 +54,11 @@ Load the timeseries data.  We'll need to convert the table from a wide format wh
 The US data in the Johns Hopkins DB seemed to get stuck with confirmed cases and drifted from other sources so I'm 
 using the NY Times for US data and Johns Hopkins for International Data.
 
+```{r}
+# data <- read.csv("https://covidtracking.com/api/v1/us/daily.csv")
+
+```
+
 ### Load International Timeseries Data - Johns Hopkins
 
 ```{r}

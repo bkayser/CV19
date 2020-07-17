@@ -3,8 +3,6 @@ title: "Report on United States and Covid19 Pandemic"
 author: "Bill Kayser"
 output:
   html_notebook: 
-    fig_height: 6
-    fig_width: 12
     toc: yes
   html_document: default
   pdf_document: 
