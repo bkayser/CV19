@@ -51,8 +51,7 @@ system('git submodule update --remote ../COVID-19')
 
 Load the timeseries data.  We'll need to convert the table from a wide format where the time series is in columns to a narrow format where each observation is a single datapoint for a day.
 
-The US data in the Johns Hopkins DB seemed to get stuck with confirmed cases and drifted from other sources so I'm 
-using the NY Times for US data and Johns Hopkins for International Data.
+The US data in the Johns Hopkins DB seemed to get stuck with confirmed cases and drifted from other sources so I'm using the NY Times for US data and Johns Hopkins for International Data.
 
 ```{r}
 # data <- read.csv("https://covidtracking.com/api/v1/us/daily.csv")

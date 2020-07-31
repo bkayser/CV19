@@ -14,14 +14,29 @@ shinyServer(function(input, output) {
   state.details <- readRDS('data/states.status.RDS')
   state.orders <- readRDS('data/orders.events.RDS')
   theme.default <- ggthemes::theme_few()
+  end_date <- max(cvdata.us.by_state$Date)
   
   data <- function(states, show.all=F) {
     filter_cvdata(cvdata.us.by_state, states, show.all)
   }
   
+  output$about <- renderUI({
+      tagList(
+        tags$h1("About"),
+        tags$p("This application was developed by ",
+               tags$a(href="https://www.linkedin.com/in/kayser",
+                      "Bill Kayser"),
+               ".  Data is updated daily but is generally one day behind."),
+        tags$h1("Last Updated"),
+        tags$p(paste0("Data reported through ", strftime(end_date, "%A, %B %e"), ".")),
+        tags$h1("Data Sources"),
+        tags$p("This data is perfect"))
+
+  })
+  
+  
   output$comparison_charts <- renderPlot({
     show.all <- input$all_states
-    end_date <- max(cvdata.us.by_state$Date)
     
     df <- data(input$states, show.all)
     df[, 'value'] <- df[,input$content]
@@ -74,18 +89,18 @@ shinyServer(function(input, output) {
     } else {
       details <- filter(state.details, State == input$state)
       
-      tag("dl",
-          list(class="state_details",
-               tag("dt", "Governor"),
-               tag("dd", details$gov.name),
-               tag("dt", "Party"),
-               tag("dd", list(details$gov.party, class=details$gov.party)),
-               tag("dt", "Current Status"),
-               tag("dd", details$status),
-               tag("dt", "Still Open"),
-               tag("dd", details$still_open),
-               tag("dt", "Still Closed"),
-               tag("dd", details$still_closed)))
+      tags$dl(
+          class="state_details",
+               tags$dt("Governor"),
+               tags$dd(details$gov.name),
+               tags$dt("Party"),
+               tags$dd(list(details$gov.party, class=details$gov.party)),
+               tags$dt("Current Status"),
+               tags$dd(details$status),
+               tags$dt("Still Open"),
+               tags$dd(details$still_open),
+               tags$dt("Still Closed"),
+               tags$dd(details$still_closed))
           
     }
   })

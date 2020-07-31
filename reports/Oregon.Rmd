@@ -1,0 +1,182 @@
+---
+title: "Report on Oregon Covid19 Pandemic"
+author: "Bill Kayser"
+output:
+  html_notebook: 
+    toc: yes
+  html_document: default
+  pdf_document: 
+    fig_height: 4
+    fig_width: 7
+    toc: yes
+echo: TRUE
+
+---
+
+```{r results='hide', message=F, include=F}
+library(tidyverse)
+library(scales)
+library(caTools)
+
+source('../utils/labels.R')
+source('../utils/utils.R')
+knitr::opts_chunk$set(echo=F)
+old_theme <- theme_set(ggthemes::theme_few())
+
+```
+
+<style type="text/css">
+.table {
+    width: inherit;
+    max-width: 100%;
+    margin-bottom: 20px;
+}
+.math.display {
+  font-size: 28px;
+}
+</style>
+
+# Load Datasets
+
+```{r echo=T}
+cvdata.us <- readRDS('../data/cvdata.us.RDS')
+cvdata.us.by_state <- readRDS('../data/cvdata.us.by_state.RDS')
+state.orders <- readRDS('../data/orders.events.RDS')
+
+# Let's first set up some parameters for the graph's X axis.
+
+start_date <- mdy('03/09/2020')
+end_date <- max(cvdata.us$Date)
+date.breaks <- seq(end_date,
+              start_date,
+              by="-2 week") %>% rev()
+
+cvdata.or <- filter(cvdata.us, State == 'Oregon')
+```
+
+### Data Disclaimer
+
+US Data provided by the New York Times [Covid Data Repository](https://www.nytimes.com/interactive/2020/us/coronavirus-us-cases.html).
+
+    Note: Data are based on reports by states and counties at the time of publication. Local governments may revise reported numbers as they get new information. Some deaths may be reported by officials in two different jurisdictions. When possible, deaths have been reported here in the jurisdiction where the death occurred.
+    Population and demographic data from Census Bureau.
+   
+# Summary
+
+To open for fall in-person learning schools must:
+
+* State positive test rate must be below 5% for 3 consecutive weeks
+* County must have 10 or fewer new cases per 100K in population over a seven day period
+* County positive test rate must be less than 5% for 3 consecutive weeks.
+
+```{r}
+or.summary <- filter(cvdata.us.by_state, State == 'Oregon') %>%
+  mutate(Cases.7Day.Total = caTools::runmean(Cases.Diff, k = 7, align='right') * 7,
+         State = fct_drop(State),
+         State.Code = fct_drop(State.Code),
+         Cases.7Day.Per100K = round(100000 * Cases.7Day.Total / Population))
+
+ggplot(or.summary) +
+  aes(x=Date,
+      y=Cases.7Day.Per100K) +
+  geom_line() +
+  geom_text(data = ~ tail(or.summary, 1), aes(label=Cases.7Day.Per100K), nudge_x = 3, color='darkred') +
+  ggtitle("Seven Day New Confirmed Cases per 100K State Residents") +
+  ylab("New Confirmed Cases") +
+  xlab(NULL) +
+  coord_cartesian(xlim=c(start_date, end_date)) +
+  scale_x_date(breaks=date.breaks, date_labels = '%m/%d')
+                   
+```
+
+# Clackamas County
+
+```{r}
+clackamas <- filter(cvdata.us, State == 'Oregon' & County == 'Clackamas') %>%
+  mutate(Cases.7Day.Total = caTools::runmean(Cases.Diff, k = 7, align='right') * 7,
+         State = fct_drop(State),
+         State.Code = fct_drop(State.Code),
+         County = fct_drop(County),
+         Cases.7Day.Per100K = round(100000 * Cases.7Day.Total / Population))
+
+ggplot(clackamas) +
+  aes(x=Date,
+      y=Cases.7Day.Per100K) +
+  geom_line() +
+  geom_text(data = ~ tail(clackamas, 1), aes(label=Cases.7Day.Per100K), nudge_x = 3, color='darkred') +
+  ggtitle("Seven Day New Confirmed Cases per 100K County Residents", subtitle = 'Clackamas County') +
+  ylab("New Confirmed Cases") +
+  xlab(NULL) +
+  coord_cartesian(xlim=c(start_date, end_date)) +
+  scale_x_date(breaks=date.breaks, date_labels = '%m/%d')
+                   
+```
+
+The county must 
+
+# Overview of Counties
+
+### Top Counties in Cases per Capita
+
+
+```{r}
+cvdata.or %>%
+  filter(Date == end_date) %>%
+  arrange(desc(Cases.Per100K)) %>%
+  mutate(Label=paste0(County,", ", State.Code)) %>%
+  select(Label, Cases.Per100K, Deaths.Per100K, Deaths) %>%
+  top_n(25) %>% knitr::kable(col.names=c('County', 'Cases Per 100K', 'Deaths Per 100K', 'Total Deaths'))
+
+```
+
+
+### Top Counties in Deaths per Capita:
+
+```{r}
+cvdata.or %>%
+  filter(!is.na(Division) & Date == end_date & Deaths > 0) %>%
+  arrange(desc(Deaths.Per100K)) %>%
+  mutate(Label=paste0(County,", ", State.Code)) %>%
+  select(Label,Deaths, Deaths.Per100K) %>%
+  top_n(25) %>% knitr::kable(col.names=c('County', 'Total Deaths', 'Deaths Per 100K'))
+```
+
+### Hotspots
+
+```{r fig.height=2, fig.width=5}
+hotspots <- cvdata.or %>%
+  mutate(Label=paste0(County,", ", State.Code)) %>%
+  filter(!is.na(Division) & Date == end_date & Cases.Diff5 >= 15) %>%
+  arrange(desc(Cases.Growth5))
+
+ggplot(head(hotspots, 5)) +
+  aes(x=reorder(Label, Cases.Growth5), 
+      label=round(Cases.Diff5), 
+      y=Cases.Growth5) +
+  geom_col(show.legend=T) +
+  scale_y_continuous(position = 'right') +
+  geom_text(aes(label=percent(Cases.Growth5)), size=4, nudge_y=0.002) +
+  coord_flip() + 
+  ylab('Average Growth 5 Day Moving Average') +
+  xlab(NULL) +
+  geom_text(y=0.003, color='white', hjust='inward') +
+  theme(line = element_blank(), 
+        panel.border = element_blank(),
+        axis.text.x = element_blank(),
+        legend.position=c(0.8,0.5))
+
+```
+
+```{r fig.height=3, fig.width=4}
+cvdata.or %>%
+  filter(Key %in% hotspots$Key[1:8]) %>%
+  mutate(Label=reorder(as.factor(paste0(County,", ", State.Code)), Cases.Growth5)) %>%
+  ggplot() +
+  aes(x=Date, y=Cases, color=Label) +
+  geom_line() +
+  coord_cartesian(xlim=c(mdy('04-21-2020'), end_date)) +
+  ggtitle("Confirmed Cases in Top 8 Hotspots") +
+  xlab(NULL) +
+  theme(legend.title=element_blank())
+```
+

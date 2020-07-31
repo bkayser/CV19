@@ -50,6 +50,8 @@ shinyUI(fluidPage(title="COVID-19 Data Console",
                  # Show a plot of the generated distribution
                  mainPanel(width=9,
                    fluid=T, plotOutput("comparison_charts", height="800px"))
-               ))
+               )),
+      tabPanel("About",
+               htmlOutput("about"))
     )
 ))
