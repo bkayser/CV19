@@ -1,7 +1,9 @@
+knitr::pandoc('about.md')
 rmarkdown::render('reports/CleanData.Rmd')
 rsconnect::deployApp(appDir = "~/Projects/Covid19", 
                      appFiles = c('server.R',
                                   'ui.R',
+                                  'about.html',
                                   'www/bootstrap.css',
                                   'utils/labels.R', 
                                   'utils/utils.R', 

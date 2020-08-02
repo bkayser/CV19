@@ -20,6 +20,8 @@ library(caTools)
 
 source('../utils/labels.R')
 source('../utils/utils.R')
+source('../plots/testing_trend.R')
+source('../plots/state_summary_plot.R')
 knitr::opts_chunk$set(echo=F)
 old_theme <- theme_set(ggthemes::theme_few())
 
@@ -466,16 +468,9 @@ ggplot() +
 
 ```{r fig.width=5, fig.height=4}
 
-testdata.ts <- cvdata.us.by_state %>%
-  mutate(Test.Positive.Rate = positive/(positive + negative),
-         Tests = positive + negative,
-         Tests.Per.Capita = 100000 * Tests/Population) %>%
-  arrange(desc(Test.Positive.Rate)) 
-
-testdata <- testdata.ts %>%
+testdata <- cvdata.us.by_state %>%
   filter(Date==max(cvdata.us.by_state$Date)) %>%
   mutate(State = fct_reorder(State, Tests.Per.Capita))  
-
 
 ggplot(testdata) +
   aes(x=State.Code, y=Tests.Per.Capita, fill=gov.party) +
@@ -485,10 +480,10 @@ ggplot(testdata) +
   ggtitle('Tests conducted per 100K population') +
   coord_flip() 
 
-testdata$State = fct_reorder(testdata$State, testdata$Test.Positive.Rate)
+testdata$State = fct_reorder(testdata$State, testdata$Testing.Positive.Rate.Total)
 
 ggplot(testdata) +
-  aes(x=State, y=Testing.Positive.Rate, fill=gov.party) +
+  aes(x=State, y=Testing.Positive.Rate.Total, fill=gov.party) +
   party_fill() +
   geom_bar(stat='identity') +
   scale_y_continuous(labels=percent, position='right') +
@@ -502,25 +497,17 @@ ggplot(testdata) +
 
 ```{r, fig.width=4, fig.height=3.5}
 
-window_width <- 4
-timerange <- 60
-history <- filter(testdata.ts, 
-                  !is.na(total.Diff5) &                  # Filter missing values
-                    total.Diff5 > 0 &                    # Filter missing values
-                    Date > today() - days(timerange))    # Recent data only
+timerange <- 90
+history <- filter(cvdata.us.by_state, 
+                  !is.na(Testing.Total.Diff5) &                  # Filter missing values
+                    Testing.Total.Diff5 > 0 &                    # Filter missing values
+                    Date > today() - days(timerange) &   # Recent data only
+                    Testing.Positive.Rate < 0.55)        # Remove outliers
 
-history.1 <- split(history, history$State) %>% 
-  lapply(function(df) {
-    arrange(df, Date) %>%
-      mutate(positiveRate = positive.Diff5 / total.Diff5)
-  }) %>% 
-  bind_rows() %>%
-  filter(positiveRate < 0.55)  # Remove outliers
-
-filter(history.1, State %in% c('New York', 'New Jersey', 'Massachusetts', 'Arizona', 'Texas', 'Georgia', 'South Carolina', 'Florida')) %>%
+filter(history, State %in% c('New York', 'New Jersey', 'Massachusetts', 'Arizona', 'Texas', 'Georgia', 'South Carolina', 'Florida')) %>%
   ggplot() +
-  aes(x=Tests.Per.Capita, y=positiveRate, color=State) +
-  ggtitle(subtitle = paste0(window_width, ' day moving average over last ', timerange, ' days'),
+  aes(x=Tests.Per.Capita, y=Testing.Positive.Rate, color=State) +
+  ggtitle(subtitle = paste0('Last ', timerange, ' days'),
           paste0('Per Capita Testing vs. Test Positive Rate')) +
   xlab('Tests per 100K Population') +
   ylab('Rate of Positive Tests') +
@@ -529,23 +516,23 @@ filter(history.1, State %in% c('New York', 'New Jersey', 'Massachusetts', 'Arizo
   scale_y_continuous(labels=percent) +
   geom_label(data=~group_by(.x, State.Code) %>% summarize(State = last(State),
                                                           Date = last(Date),
-                                                          positiveRate=last(positiveRate),
+                                                          Testing.Positive.Rate=last(Testing.Positive.Rate),
                                                           Tests.Per.Capita=last(Tests.Per.Capita)),
              aes(label=State.Code), show.legend=F)  
 
-filter(history.1, State %in% c('Oregon', 'New York', 'New Jersey', 'Massachusetts')) %>%
+filter(history, State %in% c('Oregon', 'New York', 'New Jersey', 'Massachusetts')) %>%
   ggplot() +
-  aes(x=Tests.Per.Capita, y=positiveRate, color=State) +
-  ggtitle(subtitle = paste0(window_width, ' day moving average over last ', timerange, ' days'),
+  aes(x=Tests.Per.Capita, y=Testing.Positive.Rate, color=State) +
+  ggtitle(subtitle = paste0('Last ', timerange, ' days'),
           paste0('Per Capita Testing vs. Test Positive Rate')) +
   xlab('Tests per 100K Population') +
   ylab('Rate of Positive Tests') +
   geom_line(show.legend = F, size=0.2) +
-  geom_point(show.legend = F, size=0.6) +
+  #geom_point(show.legend = F, size=0.6) +
   scale_y_continuous(labels=percent) +
   geom_label(data=~group_by(.x, State.Code) %>% summarize(State = last(State),
                                                           Date = last(Date),
-                                                          positiveRate=last(positiveRate),
+                                                          Testing.Positive.Rate=last(Testing.Positive.Rate),
                                                           Tests.Per.Capita=last(Tests.Per.Capita)),
              aes(label=State.Code), show.legend=F)  
 
@@ -554,16 +541,16 @@ filter(history.1, State %in% c('Oregon', 'New York', 'New Jersey', 'Massachusett
 
 ```{r, fig.width=5, fig.height=4}
 
-df <- filter(history.1, State %in% c('Indiana', 'California', 'Arizona', 'Oregon', 'New York')) 
-#filter(history.1, State %in% c('California', 'Maine', 'New Jersey')) %>% 
+df <- filter(history, State %in% c('Indiana', 'California', 'Arizona', 'Oregon', 'New York')) 
+#filter(history, State %in% c('California', 'Maine', 'New Jersey')) %>% 
 #  select(State, Date, contains('Increase'), contains('Rate')) %>% view()
 
-g <- split(history.1, history.1$Region) %>% 
+g <- split(history, history$Region) %>% 
   lapply(function(df) {
     df.current <- filter(df, Date == max(df$Date))
     ggplot(df) +
-      aes(x=Tests.Per.Capita, y=positiveRate, color=State) +
-      ggtitle(subtitle = paste0(window_width, ' day moving average over last ', timerange, ' days'),
+      aes(x=Tests.Per.Capita, y=Testing.Positive.Rate, color=State) +
+      ggtitle(subtitle = paste0('Last ', timerange, ' days'),
               paste0('Per Capita Testing vs. Test Positive Rate for States in ', df$Region[1], ' Region')) +
       xlab('Tests per 100K Population') +
       ylab('Rate of Positive Tests') +
@@ -575,7 +562,7 @@ g <- split(history.1, history.1$Region) %>%
   }) 
 
 g
-rm(history, history.1, timerange, window_width, df)
+rm(history, history, timerange, df)
 ```
 
 ## Arizona Counties
@@ -617,7 +604,7 @@ filter(cvdata.us.by_state, State %in% head(arrange(testdata, desc(Cases))$State,
   ylab('Cases') + xlab(NULL) +
   theme_light() +
   facet_wrap('State', 2)
-rm(testdata, testdata.ts)         
+rm(testdata)         
 ```
 
 # Bubble Charts
@@ -628,6 +615,7 @@ Plot the number of cases outside the number of recoveries.
 
 df <- filter(cvdata.us.by_state, Date == max(Date)) %>%
   arrange(desc(Long)) %>%
+  ungroup() %>%
   mutate(col = ((row_number()-1) %% 9), 
          row = ((row_number()-1) %/% 9),
          label_size = 0.05* pmax(Cases/Population, 0.002))

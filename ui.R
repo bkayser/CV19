@@ -1,8 +1,6 @@
 library(shiny)
 source('utils/labels.R')
 
-
-
 variable_choices <- cvdata.cols[cvdata.cols != 'Cases.Diff5']
 
 shinyUI(fluidPage(title="COVID-19 Data Console",
@@ -40,7 +38,7 @@ shinyUI(fluidPage(title="COVID-19 Data Console",
                    radioButtons('content', NULL, cvdata.cols, 'Cases', inline=F),
                    helpText("To change the selected states, edit the field and delete states, or add new ones from the drop down list."),
                    selectInput('states', 'States', states, 
-                               selected = c('New York', 'Oregon', 'California', 'Arizona'),
+                               selected = c('Florida', 'Texas', 'Oregon', 'California', 'Arizona'),
                                multiple = TRUE,
                                selectize = TRUE, width = NULL),
                    checkboxInput("all_states", "Show National Summary", value=FALSE),
@@ -51,7 +49,21 @@ shinyUI(fluidPage(title="COVID-19 Data Console",
                  mainPanel(width=9,
                    fluid=T, plotOutput("comparison_charts", height="800px"))
                )),
+      tabPanel("Testing",
+               sidebarLayout(
+                 sidebarPanel(width=3,
+                              helpText("To change the selected states, edit the field and delete states, or add new ones from the drop down list."),
+                              selectInput('states_t', 'States', states, 
+                                          selected = c('Florida', 'Texas', 'New York', 'Oregon', 'California', 'Arizona'),
+                                          multiple = TRUE,
+                                          selectize = TRUE, width = NULL),
+                              checkboxInput("all_states_t", "Show National Summary", value=FALSE),
+                              helpText("This plot shows the trend of positive test rate as more testing is done.  As a region tests more and more people you would hope the rate of positive tests starts to decline as infection rates decrease.  If the positive test rate continues to increase that would suggest increasing spread.  An ideal chart would show a high per capita test rate and a low positive rate: bottom-right is good.")
+                 ),
+                 mainPanel(width=9, fluid=T,
+                           plotOutput("testing_trends", height="800px"))
+               )),
       tabPanel("About",
-               htmlOutput("about"))
+               wellPanel(htmlOutput("about")))
     )
 ))
