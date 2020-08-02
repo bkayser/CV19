@@ -1,12 +1,12 @@
 knitr::pandoc('about.md')
 rmarkdown::render('reports/CleanData.Rmd')
 rsconnect::deployApp(appDir = "~/Projects/Covid19", 
-                     appFiles = c('server.R',
-                                  'ui.R',
+                     appFiles = c('server.R', 'ui.R',
                                   'about.html',
                                   'www/bootstrap.css',
                                   'utils/labels.R', 
                                   'utils/utils.R', 
+                                  list.files('plots'),
                                   'data/cvdata.us.by_state.RDS',
                                   'data/cvdata.us.RDS',
                                   'data/states.status.RDS',
