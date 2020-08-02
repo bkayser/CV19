@@ -13,7 +13,7 @@ source('plots/state_summary_plot.R')
 shinyServer(function(input, output) {
 
 
-    cvdata.us.by_state <- readRDS('data/cvdata.us.by_state.RDS') 
+  cvdata.us.by_state <- readRDS('data/cvdata.us.by_state.RDS') 
   state.details <- readRDS('data/states.status.RDS')
   state.orders <- readRDS('data/orders.events.RDS')
   theme.default <- ggthemes::theme_few()

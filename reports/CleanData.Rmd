@@ -364,9 +364,18 @@ cvdata.us.by_state <- cvdata.us %>%
          State = fct_inorder(State)) %>%
   select(Key, State, State.Code, Region, Division, Date, starts_with('Cases'), starts_with('Deaths'), contains('Recovered'), matches('^[A-Z]', ignore.case=F), -FIPS, everything())
 
-rm(states) 
-  
+# Some states seemed to remove test results, reducing the total positives suddenly.  Not
+# sure what this means but we'll change the rates on that day to NA
+cvdata.us.by_state[!is.na(cvdata.us.by_state$Testing.Total.Diff5) & cvdata.us.by_state$Testing.Total.Diff5 < 0,
+                   c('Testing.Total.Diff5', 'Testing.Rate.Weekly', 'Testing.Positive.Rate')] <- NA
 
+rm(states) 
+#   
+# filter(cvdata.us.by_state, Testing.Total.Diff < 0)
+# filter(cvdata.us.by_state, State.Code %in% c('MN', 'MO', 'HI')) %>% 
+#   ggplot() + aes(x=Date,color=State.Code ) + 
+#   geom_line(aes(y=negative), linetype=2) +
+#   geom_line(aes(y=positive), linetype=3)
 ```
 
 

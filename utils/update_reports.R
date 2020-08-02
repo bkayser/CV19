@@ -6,7 +6,7 @@ rsconnect::deployApp(appDir = "~/Projects/Covid19",
                                   'www/bootstrap.css',
                                   'utils/labels.R', 
                                   'utils/utils.R', 
-                                  list.files('plots'),
+                                  list.files('plots', full.names=T),
                                   'data/cvdata.us.by_state.RDS',
                                   'data/cvdata.us.RDS',
                                   'data/states.status.RDS',
@@ -22,6 +22,8 @@ system("open https://surprise.shinyapps.io/COVID19Demo")
 
 rmarkdown::render('reports/States.Rmd')
 system("open reports/States.nb.html")
+rmarkdown::render('reports/Oregon.Rmd')
+system("open reports/Oregon.nb.html")
 rmarkdown::render('reports/International.Rmd')
 system("open reports/International.nb.html")
 rmarkdown::render('reports/Predict.Rmd')
