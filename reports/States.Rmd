@@ -20,6 +20,8 @@ library(caTools)
 
 source('../utils/labels.R')
 source('../utils/utils.R')
+source('../plots/testing_trend.R')
+source('../plots/state_summary_plot.R')
 knitr::opts_chunk$set(echo=F)
 old_theme <- theme_set(ggthemes::theme_few())
 
@@ -602,7 +604,7 @@ filter(cvdata.us.by_state, State %in% head(arrange(testdata, desc(Cases))$State,
   ylab('Cases') + xlab(NULL) +
   theme_light() +
   facet_wrap('State', 2)
-rm(testdata, cvdata.us.by_state)         
+rm(testdata)         
 ```
 
 # Bubble Charts
