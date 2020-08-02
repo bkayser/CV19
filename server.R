@@ -15,26 +15,25 @@ shinyServer(function(input, output) {
   state.orders <- readRDS('data/orders.events.RDS')
   theme.default <- ggthemes::theme_few()
   end_date <- max(cvdata.us.by_state$Date)
-  
+  test.timerange <- 90
+
   data <- function(states, show.all=F) {
     filter_cvdata(cvdata.us.by_state, states, show.all)
   }
   
   output$about <- renderUI({
       tagList(
-        tags$h1("About"),
-        tags$p("This application was developed by ",
-               tags$a(href="https://www.linkedin.com/in/kayser",
-                      "Bill Kayser"),
-               ".  Data is updated daily but is generally one day behind."),
-        tags$h1("Last Updated"),
-        tags$p(paste0("Data reported through ", strftime(end_date, "%A, %B %e"), ".")),
-        tags$h1("Data Sources"),
-        tags$p("This data is perfect"))
-
+        HTML(read_file('about.html')),
+        tags$h3(paste0("Data reported through ", strftime(end_date, "%A, %B %e, %Y"), "."))
+        )
   })
   
-  
+  output$testing_trends <- renderPlot({
+    testing.trend(cvdata.us.by_state, 
+                  timerange = 90,
+                  states = input$states_t,
+                  show.all = input$all_states_t)
+  })
   output$comparison_charts <- renderPlot({
     show.all <- input$all_states
     

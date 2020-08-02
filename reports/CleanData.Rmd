@@ -86,6 +86,7 @@ raw_county_data <- read.csv('https://raw.githubusercontent.com/nytimes/covid-19-
   as_tibble()
 ```
 
+
 Now we need to pad data with zeros.
 
 ```{r}
@@ -101,6 +102,25 @@ county_data <- expand_grid(Date = unique(raw_county_data$Date),
          Deaths = ifelse(is.na(Deaths), 0, Deaths)) %>%
   arrange(State, Key, Date)
 rm(raw_county_data)
+```
+
+The cases and deaths data provided for the five counties of New York City is aggregated into a single entity called "New York City" with no FIPS.
+
+For purposes of joining data, I'm going to use the New York County FIPS for "New York City".
+
+```{r}
+FIPS.nyc <- 36061
+county_data[county_data$County == 'New York City', 'FIPS'] <- FIPS.nyc
+```
+
+
+### Load US Timeseries Data - Johns Hopkins
+
+```{r}
+
+cases <- read_and_clean('../COVID-19/csse_covid_19_data/csse_covid_19_time_series/time_series_covid19_confirmed_US.csv')
+deaths <- read_and_clean('../COVID-19/csse_covid_19_data/csse_covid_19_time_series/time_series_covid19_deaths_US.csv')
+
 ```
 
 
@@ -144,7 +164,7 @@ ny.row <- which(population_data$CTYNAME == 'New York County')
 population_data[ny.row, 'Population'] <- nyc['Population']
 population_data[ny.row, 'Annual.Deaths'] <- nyc['Annual.Deaths']
 population_data[ny.row, 'Area'] <- nyc['Area']
-FIPS.nyc <- population_data[ny.row,]$FIPS
+
 population_data[ny.row, 'CTYNAME'] <- 'New York City'  # This is needed only for NYT sourced cases
 
 # Remove other boroughs since we don't get data for them.
@@ -197,26 +217,32 @@ states.summary <- readRDS('../data/states.status.RDS') %>%
                                   'Major restrictions')))
 ```
 
-The cases and deaths data provided for the five counties of New York City is aggregated into a single entity called "New York City" with no FIPS.
-
-For purposes of joining data, I'm going to use the New York County FIPS for "New York City".
-
-```{r}
-county_data[county_data$County == 'New York City', 'FIPS'] <- FIPS.nyc
-```
-
 
 Join the US confirmed cases to deaths and census population data.  Create a single table, `cvdata.us`.
 
 ```{r}
-cvdata.us <- county_data %>%
+cvdata.us <- left_join(cases, 
+                       select(deaths, Key, Date, Count),
+                       by=c('Key', 'Date')) %>%
+  rename(Cases = Count.x,
+         Deaths = Count.y) %>%
   left_join(counties, by='FIPS') %>% 
   left_join(states.summary, by=c('State')) %>%
   filter(!is.na(Region)) %>%
   mutate(State = as.factor(State), 
          County = as.factor(County)) %>%
   calculate_differentials(c('Cases', 'Deaths'))
-rm(counties, county_data)
+rm(cases, deaths, counties)
+
+# When using NYT data:
+# cvdata.us <- county_data %>%
+#   left_join(counties, by='FIPS') %>% 
+#   left_join(states.summary, by=c('State')) %>%
+#   filter(!is.na(Region)) %>%
+#   mutate(State = as.factor(State), 
+#          County = as.factor(County)) %>%
+#   calculate_differentials(c('Cases', 'Deaths'))
+# rm(counties, county_data)
 ```
 
 Join the cases and deaths for country data into a single table, `cvdata.i18n`.
@@ -317,7 +343,7 @@ cvdata.us.by_state <- cvdata.us %>%
             Deaths = sum(Deaths),
             Lat = last(Lat),
             Long = last(Long))%>%
-  ungroup(State, Date) %>%
+  ungroup() %>%
   left_join(states, by=c('State')) %>%
   filter(!is.na(Region)) %>%
   left_join(covid.testing, by=c('State.Code', 'Date')) %>%
@@ -325,12 +351,13 @@ cvdata.us.by_state <- cvdata.us %>%
   calculate_differentials(c('Cases', 'Deaths')) %>%
   mutate(Infection.Rate = Cases.Diff * 1000000 / Population,
          Death.Rate = Deaths.Diff * 1000000 / Population,
-         total = positive + negative,
-         Testing.Rate.Total = total / Population,
-         Testing.Positive.Rate.Total = positive / total) %>%
-  calculate_differentials(c('total', 'positive', 'negative'), growth=F) %>%
-  mutate(Testing.Rate.Weekly = 7 * total.Diff5 / Population,
-         Testing.Positive.Rate = positive.Diff5 / total.Diff5) %>%
+         Testing.Total = positive + negative,
+         Testing.Rate.Total = Testing.Total / Population,
+         Testing.Positive.Rate.Total = positive / Testing.Total,
+         Tests.Per.Capita = 100000 * Testing.Rate.Total) %>%
+  calculate_differentials(c('Testing.Total', 'positive', 'negative'), growth=F) %>%
+  mutate(Testing.Rate.Weekly = 7 * Testing.Total.Diff5 / Population,
+         Testing.Positive.Rate = positive.Diff5 / Testing.Total.Diff5) %>%
   add_estimated_recoveries() %>%
   left_join(states.summary, by=c('State', 'State.Code')) %>%
   mutate(State.Code = fct_inorder(as.factor(State.Code)),
