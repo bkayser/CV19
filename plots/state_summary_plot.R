@@ -90,13 +90,14 @@ state_summary_plot = function(data,
     }
     g <- g + 
       geom_vline(data=orders,
-                 aes(xintercept=date, color=type, alpha='0'),
+                 aes(xintercept=date, color=type),
+                 alpha=0.05,
                  size=1, 
                  show.legend = T) +
       scale_alpha_manual(values=0, guide=F) +
       geom_area(data=lockdown.range,
                 #aes(ymax=Cases.Diff5),
-                fill='#aec0c6',
+                fill='#ddc0c6',
                 alpha=0.2) 
     if (show.all) {
       g <- g +
@@ -127,4 +128,13 @@ state_summary_plot = function(data,
     g <- g + geom_smooth(alpha=0.05, method='loess', color='black', fill='green', fullrange=T, span=0.5, size=0.5, linetype=3) 
   }
   g
+}
+
+test <- function( ) {
+  state_summary_plot(cvdata.us.by_state,
+                     'South Dakota',
+                     readRDS('data/orders.events.RDS'))
+                     
+  
+  
 }

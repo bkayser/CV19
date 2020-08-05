@@ -8,6 +8,20 @@ shinyUI(fluidPage(title="COVID-19 Data Console",
     # Application title
     titlePanel("Exploring COVID-19 Data"),
     tabsetPanel(
+      tabPanel("Testing",
+               sidebarLayout(
+                 sidebarPanel(width=3,
+                              helpText("To change the selected states, edit the field and delete states, or add new ones from the drop down list."),
+                              selectInput('states_t', 'States', states, 
+                                          selected = c('Florida', 'Texas', 'New York', 'Oregon', 'California', 'Arizona'),
+                                          multiple = TRUE,
+                                          selectize = TRUE, width = NULL),
+                              checkboxInput("all_states_t", "Show National Summary", value=FALSE),
+                              helpText("This plot shows the trend of positive test rate as more testing is done.  As a region tests more and more people you would hope the rate of positive tests starts to decline as infection rates decrease.  If the positive test rate continues to increase that would suggest increasing spread.  An ideal chart would show a high per capita test rate and a low positive rate: bottom-right is good.")
+                 ),
+                 mainPanel(width=9, fluid=T,
+                           plotOutput("testing_trends", height="800px"))
+               )),
       tabPanel("State Growth Detail", 
                sidebarLayout(
                  sidebarPanel(width=3,
@@ -49,20 +63,7 @@ shinyUI(fluidPage(title="COVID-19 Data Console",
                  mainPanel(width=9,
                    fluid=T, plotOutput("comparison_charts", height="800px"))
                )),
-      tabPanel("Testing",
-               sidebarLayout(
-                 sidebarPanel(width=3,
-                              helpText("To change the selected states, edit the field and delete states, or add new ones from the drop down list."),
-                              selectInput('states_t', 'States', states, 
-                                          selected = c('Florida', 'Texas', 'New York', 'Oregon', 'California', 'Arizona'),
-                                          multiple = TRUE,
-                                          selectize = TRUE, width = NULL),
-                              checkboxInput("all_states_t", "Show National Summary", value=FALSE),
-                              helpText("This plot shows the trend of positive test rate as more testing is done.  As a region tests more and more people you would hope the rate of positive tests starts to decline as infection rates decrease.  If the positive test rate continues to increase that would suggest increasing spread.  An ideal chart would show a high per capita test rate and a low positive rate: bottom-right is good.")
-                 ),
-                 mainPanel(width=9, fluid=T,
-                           plotOutput("testing_trends", height="800px"))
-               )),
+      
       tabPanel("About",
                wellPanel(htmlOutput("about")))
     )
