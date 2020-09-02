@@ -107,7 +107,7 @@ I believe these dates represent when things will be at their worst.  There will 
 major_countries <- 
   filter(cvdata.i18n, Cases > 100 & Country %in% c("European Union", "Brazil", "US","India", "Canada",
                                                    "Italy", "Korea, South", "United Kingdom", "US", 
-                                                   "Brazil", "India", "South Africa", "Iceland", "Belgium", "Ireland", "San Marino", "Sweden",
+                                                   "Brazil", "India", "South Africa", "Iceland", "Belgium", "Ireland",  "Sweden",
                                                    "Norway", "Denmark", "United Arab Emirates")) %>%
   mutate(Country = fct_relevel(Country, 'EU', 'Brazil', 'India', 'US')) %>%
   filter(!is.na(Population))
@@ -387,4 +387,49 @@ rm(predictions.state.list)
 # What's Next?
 
 If I am going to keep developing this I'll probably try to mix in data on recoveries to see if I can predict the next milestone.  If this predicted milestone is when things are at their worst, the next milestone is when we've recovered enough to where restrictions can be loosened.
+
+
+# New Hypothesis
+
+Chris suggested that maybe some regions are reaching herd immunity.  If this happens maybe we can estimate when the herd immunity is starting to kick in.  That would be where new infections are declining in spite of weak mitigation measures.  Think of Florida, which might have the weakest measures for prevention (no mask mandate, etc).  If the new infections start declining there, is it possible that it's more to do with overall prevalence of infections, past and present, rather than any social interventions?
+
+It's hard to estimate the actual infection rate from confirmed cases because the test rate varies so much.  But if the Infection Fatality Rate is fairly consistent then we should see a closer correspondence between infections and deaths.  So let's look at deaths per capita versus new infections per capita.
+
+```{r}
+# What is the infection fatality rate?  There's a big range
+# https://www.medrxiv.org/content/10.1101/2020.05.13.20101253v3
+IFR <- 0.0024
+top.states <- group_by(cvdata.us.by_state, State) %>%
+  summarize(max.deaths = max(Deaths.Diff5.Per100K)) %>%
+  arrange(desc(max.deaths)) %>%
+  head(15)
+df.states <- filter(cvdata.us.by_state, State %in% top.states$State) %>%
+  mutate(State = factor(State, levels=top.states$State))
+#df.states <- cvdata.us.by_state
+
+states.list <- split(df.states, fct_drop(df.states$State))
+
+df.adj <- lapply(states.list, function(df) {
+  ndays <- nrow(df)
+  tibble(State = df$State[1],
+         Deaths = df$Deaths.Per100K[21:ndays],
+         NewCases = df$Cases.Diff5.Per100K[1:(ndays-21+1)]) %>%
+  mutate(Est.Infections = Deaths/IFR)
+}) %>% bind_rows()
+
+max.growth <- group_by(df.adj, State) %>% 
+  summarize(mg=max(NewCases)) 
+for(row in 1:nrow(max.growth)) {
+  state <- max.growth$State[row]
+  max.growth[row, 'peak.IR'] <- 
+    df.adj$Est.Infections[df.adj$State == state & df.adj$NewCases == max.growth$mg[row]] %>% tail(1)
+}
+ggplot(df.adj) +
+  aes(x=Est.Infections, y=NewCases, color=State) +
+  geom_line(show.legend=T) +
+  geom_vline(data=max.growth, aes(xintercept=peak.IR, color=State), alpha=0.8, show.legend = F)
+
+ggplot(max.growth) +
+  geom_histogram(aes(x=peak.IR), bins=50)
+```
 

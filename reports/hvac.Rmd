@@ -1,0 +1,79 @@
+---
+title: "Evaluation of HVAC and COVID-19 Growth Rates"
+author: "Bill Kayser"
+date: "August 25, 2020"
+echo: TRUE
+---
+
+```{r results='hide', message=F, include=F}
+library(survey)
+library(tidyverse)
+# library(scales)
+library(knitr)
+theme_set(theme_light())
+# source('../utils/utils.R')
+knitr::opts_chunk$set(echo=F)
+```
+
+
+<style type="text/css">
+.table {
+    width: inherit;
+    max-width: 100%;
+    margin-bottom: 20px;
+}
+.math.display {
+  font-size: 28px;
+}
+</style>
+
+
+# Introduction
+
+## Load 2015 RECS Survey Data
+
+The Residential Energy Consumption Surveys (RECS) are used to estimate energy usage in homes.  They are conducted by the US Energy Information Administration.  Data and information can be downloaded from [https://www.eia.gov/consumption/residential/data/2015/index.php?view=microdata](https://www.eia.gov/consumption/residential/data/2015/index.php?view=microdata).
+
+The survey data uses replicate weights using Fay's method:
+   
+   Dippo, Cathryn S., Robert E. Fay, and David H. Morganstein. 1984. “Computing Variances
+   From Complex Samples With Replicate Weights.” In Proceedings of the Survey Research
+   Methods Section. Washington, DC: American Statistical Association: 489–494.
+
+
+```{r}
+
+recs <- read.csv('../data/recs2015_public_v4.csv') %>%
+  select(DOEID,  # record UID
+         REGIONC, DIVISION,   # Census region and division
+         NHSLDMEM, # Number of household members
+         CDD30YR,  # 30 Year average, cooling days 65 degrees,
+         HDD30YR,  # 30 Year average, heating days 65 degrees
+         KWHCOL,   # Electricity usage for cooling, kilowatt hours) 
+         NWEIGHT,  # total sample weight
+         starts_with('BRRWT')) %>%  # BRR weights
+         mutate(REGIONC = as.factor(REGIONC),
+                DIVISION = as.factor(DIVISION))
+```
+
+The weights are used to calculate Relative Standard Error as a percentage of the mean value.
+The code for calculating these RSEs is detailed in the [reference document](https://www.eia.gov/consumption/residential/data/2015/pdf/microdata_v3.pdf) on the EIA page above.
+
+```{r}
+sampweights <- recs$NWEIGHT
+brrwts <- select(recs, starts_with("BRRWT"))
+des <- svrepdesign(weights=sampweights, 
+                   repweights=brrwts, 
+                   type="Fay", 
+                   rho=0.5, 
+                   mse=TRUE,
+                   data=recs)
+des
+```
+
+
+I stopped here because breaking down this data by census division is not going to show anything informative, even if there is an association.  Too many other candidate dependencies, such as political influence, varying mitigation strategies, social patterns.  In otherwords, the hot regions tend to lean republican, which tend to lean to less restrictive measures.  
+
+Might be different if you could do it state by state.
+
+

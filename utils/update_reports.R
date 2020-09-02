@@ -1,3 +1,4 @@
+args <- commandArgs(T)
 knitr::pandoc('about.md')
 rmarkdown::render('reports/CleanData.Rmd')
 rsconnect::deployApp(appDir = "~/Projects/Covid19", 
@@ -18,11 +19,14 @@ rsconnect::deployApp(appDir = "~/Projects/Covid19",
                      metadata = list(asMultiple = FALSE, asStatic = FALSE,ignoredFiles = "_app.R|.gitmodules|.RData|CleanData.nb.html|CleanData.pdf|CleanData.Rmd|LICENSE|README.md"),     
                      logLevel = "verbose") 
 
-system("open https://surprise.shinyapps.io/COVID19Demo")
 
 rmarkdown::render('reports/States.Rmd')
-system("open reports/States.nb.html")
 rmarkdown::render('reports/Oregon.Rmd')
-system("open reports/Oregon.nb.html")
 rmarkdown::render('reports/International.Rmd')
+# If there is a supplied command line arg then open the pages
+if (args[1] == '1') {
+system("open https://surprise.shinyapps.io/COVID19Demo")
+system("open reports/States.nb.html")
+system("open reports/Oregon.nb.html")
 system("open reports/International.nb.html")
+}
