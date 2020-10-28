@@ -173,3 +173,7 @@ filter_cvdata <- function(data, states, show.all=F) {
 party_fill <- function() {
   scale_fill_manual(values = c('D' = '#6666FF', 'R'='#FF6666'), na.value='#BBBBBB')
 }
+
+party_color <- function() {
+  scale_color_manual(values = c('D' = '#6666FF', 'R'='#FF6666'), na.value='#BBBBBB')
+}
