@@ -12,12 +12,7 @@ comparison_chart <- function(cvdata.by_state,
   df <- filter_cvdata(cvdata.by_state, states, show.all)
   df[, 'value'] <- df[, column]
   
-  if (str_ends(column, 'Growth5') | str_detect(column, 'Rate')) {
-    df$value.formatted <- percent(df$value, accuracy=0.1)
-  } else {
-    df$value.formatted <- comma(df$value, accuracy=1)
-  }
-  
+  df$value.formatted <- format_value(column, df$value)
 
   value.label <- names(cvdata.cols)[cvdata.cols == column]
   end_date <- max(df$Date)
@@ -85,7 +80,7 @@ comparison_chart <- function(cvdata.by_state,
 function () {
 
   comparison_chart(cvdata.us.by_state, c('Oregon', 'California', 'Arizona', 'Texas'), 
-                   column = 'Deaths.Growth5',
+                   column = 'Deaths.Diff5.Per100K',
                    show.all=T)
   
 }
