@@ -226,7 +226,7 @@ rm(d0,d1,d2, labels, g)
 
 ```{r, fig.height=3, fig.width=4}
 compdata <- cvdata.i18n %>%
-  filter(Country %in% c('US', 'European Union', 'Brazil', 'Sweden') &
+  filter(Country %in% c('US', 'European Union', 'Mexico', 'Sweden') &
            Date > mdy('02/26/2020')) 
 
 compdata.last <- filter(compdata, Date == end_date)
@@ -334,4 +334,12 @@ cvdata.i18n %>%
   theme(legend.position = c(0.2, 0.8)) +
   ggtitle("Comparison of Cases per Capita Between EU and US",
           subtitle="Data from Johns Hopkins University Covid19 Repository")
+```
+
+### Analysis of Mexico
+```{r}
+
+cvdata.i18n %>%
+  filter(Country == 'Mexico') %>%
+  summary()
 ```

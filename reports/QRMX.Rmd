@@ -1,0 +1,77 @@
+---
+title: "Report on Quintana Roo  "
+author: "Bill Kayser"
+output:
+  html_notebook: 
+    toc: yes
+  html_document: default
+echo: TRUE
+---
+
+```{r results='hide', message=F, include=F}
+library(tidyverse)
+library(scales)
+library(caTools)
+source('../utils/utils.R')
+knitr::opts_chunk$set(echo=F)
+#old_theme <- theme_set(ggthemes::theme_fivethirtyeight())
+old_theme <- theme_set(ggthemes::theme_few())
+
+
+```
+
+
+<style type="text/css">
+.table {
+    width: inherit;
+    max-width: 100%;
+    margin-bottom: 20px;
+}
+.math.display {
+  font-size: 28px;
+}
+</style>
+
+```{r}
+
+dates <- dir('../COVID-19/csse_covid_19_data/csse_covid_19_daily_reports/', pattern="*.csv" ) %>% str_extract("..-..-....") 
+
+history <- lapply(dates, function(date) {
+  read.csv(str_c('../COVID-19/csse_covid_19_data/csse_covid_19_daily_reports/', date, '.csv')) %>%
+    rename_with(~gsub(".", "_", .x, fixed=T)) %>%
+    filter( Province_State == 'Quintana Roo') %>%
+    mutate(Date = parse_date(date, "%m-%d-%Y"))
+}) %>% 
+  bind_rows() %>% 
+  rename(Key = Combined_Key) %>%
+  mutate(Population = 1896923) %>% # Population estimate from http://population.city/mexico/adm/quintana-roo/
+  as_tibble() %>%
+  calculate_differentials(c('Confirmed', 'Deaths', 'Active'), growth=T) %>%
+  select(Date, starts_with('Confirmed'), starts_with('Deaths'), Recovered, Active, Case_Fatality_Ratio) %>%
+  pivot_longer(-Date)
+
+```
+
+```{r date}
+date <- max(history$Date)
+```
+Statistics valid as of `r date`.
+
+```{r stats}
+history %>% 
+  filter(Date == date & name %in% c('Confirmed','Confirmed.Diff5', 'Confirmed.Per100K', 'Deaths', 'Deaths.Per100k', 'Deaths.Diff5', 'Deaths.Diff5.Per100K', 'Active')) %>%
+  select(-Date) %>%
+#  mutate(value = format(signif(value, 3), scientific=F)) %>%
+  knitr::kable(format.args=list(scientific=F), digits=2)
+
+```
+```{r plots, fig.width=6, fig.height=6}
+
+ggplot(history) +
+  aes(x=Date, y=value) +
+  facet_wrap('name', ncol=3, scales = 'free_y') +
+  geom_line() +
+  geom_point(shape=3, size=0.25)
+  
+
+```
