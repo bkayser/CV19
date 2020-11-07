@@ -17,6 +17,7 @@ echo: TRUE
 library(tidyverse)
 library(scales)
 library(caTools)
+library(ggthemes)
 
 source('../utils/labels.R')
 source('../utils/utils.R')

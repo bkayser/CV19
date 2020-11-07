@@ -33,7 +33,8 @@ state_summary_plot = function(data,
   }
   state.data$Overlay <- unlist(state.data[overlay]) * scale.factor
   overlay.label <- names(cvdata.cols)[cvdata.cols == overlay]
-  overlay.format <- ifelse(str_ends(overlay, 'Growth5') | str_detect(overlay, 'Rate'), percent, comma)
+  overlay.format <- value_formatter(overlay)
+ 
   
   g <- ggplot(state.data) +
     aes(x=Date, y=Cases.Diff5) +
@@ -52,6 +53,7 @@ state_summary_plot = function(data,
               size=6,
               nudge_y=0.1 * last.recorded.value * scale.factor,
               nudge_x=-12,
+              hjust='right',
               show.legend = F) +
     ggthemes::theme_few() + 
     theme(text = element_text(size=14),
