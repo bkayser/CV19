@@ -1,7 +1,7 @@
 library(shiny)
 source('utils/labels.R')
 
-variable_choices <- cvdata.cols[cvdata.cols != 'Cases.Diff5']
+variable_choices <- cvdata.cols
 
 shinyUI(fluidPage(title="COVID-19 Data Console",
                   theme="bootstrap.css",
@@ -35,7 +35,7 @@ shinyUI(fluidPage(title="COVID-19 Data Console",
                    radioButtons('overlay', 
                                 label = NULL, 
                                 choices = variable_choices,
-                                selected = 'Cases',
+                                selected = 'Deaths.Diff5',
                                 inline = F),
                    checkboxInput("show_lockdown", "Show Lockdown", TRUE),
                    checkboxInput("show_trend", "Show Trendline", FALSE)

@@ -23,7 +23,7 @@ state_summary_plot = function(data,
   
   date.breaks <- seq(end_date,
                      start_date.adj,
-                     by="-1 week") %>% rev()
+                     by="-2 week") %>% rev()
   last.recorded.value <- tail(state.data, 1) %>% pull(overlay)
   # scale the overlay so it fits in the graph
   if (overlay == 'Cases.Diff') {

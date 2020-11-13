@@ -42,7 +42,7 @@ comparison_chart <- function(cvdata.by_state,
   start_date.adj <- mdy('03-14-2020')
   breaks <- seq(end_date,
                 start_date.adj,
-                by="-1 week") %>% rev()
+                by="-2 week") %>% rev()
   if (breaks[1] != start_date.adj) {
     breaks <- c(breaks[1]-days(7), breaks)
     start_date.adj <- breaks[1]
