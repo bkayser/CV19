@@ -104,9 +104,11 @@ hotspots <- cvdata.us %>%
   arrange(desc(Cases.Growth5)) 
 
 ggplot(head(hotspots, 25)) +
-  aes(x=reorder(Label, Cases.Growth5), fill = gov.party, label=round(Cases.Diff5), y=Cases.Growth5) +
+  aes(x=reorder(Label, Cases.Growth5), fill = Biden_percent, label=round(Cases.Diff5), y=Cases.Growth5) +
   geom_col(show.legend=T) +
-  party_fill() +
+  #party_fill() +
+#  scale_fill_gradient2(midpoint=50, low='red', mid='#666666', high='blue') +
+  scale_fill_gradient(low='red', high='blue') +
   scale_y_continuous(position = 'right') +
   geom_text(aes(label=percent(Cases.Growth5)), size=4, nudge_y=0.01) +
   coord_flip() + 
@@ -119,6 +121,20 @@ ggplot(head(hotspots, 25)) +
         legend.position=c(0.8,0.5))
 
 ```
+```{r fig.width=6, fig.height=4}
+
+filter(cvdata.us, Date == max(cvdata.us$Date) & !is.na(Biden_percent)) %>%
+ggplot() +
+  aes(x=Cases.Per100K, size = Population, y=Biden_percent, color=Biden_percent >= Trump_percent) +
+  geom_point(alpha=0.8) +
+  scale_size_area() +
+  ylab('Biden Vote Percentage') +
+  xlab('Cases Per 100K Population') 
+  #scale_color_gradient(low='red', high='blue') +
+#  scale_x_log10() +
+#  scale_y_log10()
+```
+
 
 ```{r fig.height=3, fig.width=6}
 cvdata.us %>%

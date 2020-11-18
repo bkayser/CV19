@@ -136,5 +136,7 @@ function() {
     election.counties <- bind_rows(election.counties, data$counties)
     election.states <- bind_rows(election.states, data$summary)
   }
+  saveRDS(election.counties, 'data/election.counties.RDS')
+  saveRDS(election.states, 'data/election.states.RDS')
 }
 
