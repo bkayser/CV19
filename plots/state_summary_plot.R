@@ -5,8 +5,13 @@ state_summary_plot = function(data,
                               overlay='Deaths.Diff5', 
                               show.all=F, 
                               show.lockdown=T,
-                              show.trend=T){
-  start_date <- mdy('02/26/2020')
+                              show.trend=T,
+                              limit.60=F){
+  if (limit.60) {
+    start_date <- today() - days(60)
+  } else {
+    start_date <- mdy('02/26/2020')
+  }
   end_date <- max(data$Date)
   
   state.data <- filter_cvdata(data, state, show.all) %>% 
@@ -23,7 +28,7 @@ state_summary_plot = function(data,
   
   date.breaks <- seq(end_date,
                      start_date.adj,
-                     by="-2 week") %>% rev()
+                     by=ifelse(limit.60, "-1 week", "-2 week")) %>% rev()
   last.recorded.value <- tail(state.data, 1) %>% pull(overlay)
   # scale the overlay so it fits in the graph
   if (overlay == 'Cases.Diff') {

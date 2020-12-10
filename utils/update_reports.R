@@ -23,7 +23,6 @@ rsconnect::deployApp(appDir = "~/Projects/Covid19",
 rmarkdown::render('reports/States.Rmd')
 rmarkdown::render('reports/Oregon.Rmd')
 rmarkdown::render('reports/International.Rmd')
-rmarkdown::render('reports/QRMX.Rmd')
 # If there is a supplied command line arg then open the pages
 if (args[1] == '1') {
 system("open https://surprise.shinyapps.io/COVID19Demo")

@@ -68,7 +68,8 @@ shinyServer(function(input, output) {
                        overlay=input$overlay,
                        show.all=input$combined,
                        show.lockdown=input$show_lockdown,
-                       show.trend=input$show_trend)
+                       show.trend=input$show_trend,
+                       limit.60 = input$last60)
   })
 })
 

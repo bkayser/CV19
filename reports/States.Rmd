@@ -42,6 +42,7 @@ old_theme <- theme_set(ggthemes::theme_few())
 # Load Datasets
 
 ```{r echo=T}
+cvdata.i18n <- readRDS('../data/cvdata.i18n.RDS')
 cvdata.us <- readRDS('../data/cvdata.us.RDS')
 cvdata.us.by_state <- readRDS('../data/cvdata.us.by_state.RDS')
 state.orders <- readRDS('../data/orders.events.RDS')
@@ -125,15 +126,25 @@ ggplot(head(hotspots, 25)) +
 
 filter(cvdata.us, Date == max(cvdata.us$Date) & !is.na(Biden_percent)) %>%
 ggplot() +
-  aes(x=Cases.Per100K, size = Population, y=Biden_percent, color=Biden_percent >= Trump_percent) +
-  geom_point(alpha=0.8) +
+  aes(y=Trump_percent, size = Population, x=Cases.Per100K, color=gov.party) +
+  geom_point(alpha=1) +
   scale_size_area() +
-  ylab('Biden Vote Percentage') +
+  party_color() +
+  ylab('Trump Vote Percentage') +
   xlab('Cases Per 100K Population') 
   #scale_color_gradient(low='red', high='blue') +
 #  scale_x_log10() +
 #  scale_y_log10()
 ```
+
+```{r}
+
+  model <- lm(data = cvdata.us,
+     Cases.Per100K ~ Trump_percent)
+
+
+```
+
 
 
 ```{r fig.height=3, fig.width=6}
@@ -314,7 +325,17 @@ cvdata.us.by_state %>%
 
 ```
 
+## Case Fatality Rate
 
+```{r}
+filter(cvdata.i18n, Country == 'US') %>%
+ggplot() +
+  aes(x=Date, y = Deaths/Cases) +
+  ylab('Deaths/Cases') +
+  scale_y_continuous(labels = percent) +
+  geom_line()
+
+```
 ## State Summary
 
 
